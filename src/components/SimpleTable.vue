@@ -3,7 +3,10 @@
         <b-table id="table" :fields="fields()" :items="items()" :key="mainKey">
             <template v-slot:cell()="data">
                 <span class="centered" v-if="data.value.record === undefined">
-                    <span v-if="move !== null">
+                    <span v-if="data.item.__isShadow">
+                        <b-icon icon="plus" @click="__addShadow(data.item.__file)" />
+                    </span>
+                    <span v-else-if="move !== null">
                         <b-icon icon="arrow-up" @click="move(data.index, 'up')" />
                         &nbsp;
                         <b-icon icon="arrow-down" @click="move(data.index, 'down')" />
@@ -60,6 +63,13 @@
         },
 
         methods: {
+            /**
+             * @param {!File} file
+             */
+            __addShadow(file) {
+                file.addShadowRecord();
+                this.mainKey += 1;
+            },
             /**
              * @param {!Record} record
              */
