@@ -59,7 +59,8 @@
         props: {
             'fields': Function,
             'items': Function,
-            'move': Function
+            'move': Function,
+            'refresh': Function
         },
 
         methods: {
@@ -68,6 +69,9 @@
              */
             __addShadow(file) {
                 file.addShadowRecord();
+                if (this.refresh !== undefined) {
+                    this.refresh();
+                }
                 this.mainKey += 1;
             },
             /**
@@ -75,6 +79,9 @@
              */
             __delete(record) {
                 record.__delete();
+                if (this.refresh !== undefined) {
+                    this.refresh();
+                }
                 this.mainKey += 1;
             }
         }

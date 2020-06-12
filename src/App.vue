@@ -165,33 +165,18 @@
                                     <SimpleTable :fields="divers.frequencyFields" :items="divers.frequencyItems" :move="null" />
                                 </span>
                                 <span :key="divers.stationKey" v-else-if="element.action.special === 'stops.station'">
-                                    <table>
-                                        <thead>
-                                            <tr>
-                                                <th>
-                                                    Stop ID
-                                                </th>
-                                                <th>
-                                                    Name
-                                                </th>
-                                                <th>
-                                                    Type
-                                                </th>
-                                                <th>
-                                                    Platform
-                                                </th>
-                                                <th>
-                                                    Action
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <SimpleTree :deleter="divers.stationDeleter" :depth="0" :isRendered="true" :root="divers.tree.data" />
-                                        </tbody>
-                                    </table>
+                                    <SimpleTree :fields="divers.stationFields" :handler="divers.stationHandler" :root="divers.tree.data" />
+                                </span>
+                                <span :key="divers.stationAddKey" v-else-if="element.action.special === 'stops.station_add'">
+                                    <SimpleTable
+                                        :fields="divers.stationAddFields"
+                                        :items="divers.stationAddItems"
+                                        :move="null"
+                                        :refresh="divers.stationAddRefresh"
+                                    />
                                 </span>
                                 <span :key="divers.mapKey" v-else-if="element.action.special === 'stops.map'">
-                                    Ooops! I should be a map! <!-- TODO -->
+                                    <SimpleMap :root="divers.tree.data" />
                                 </span>
                                 <span :key="divers.transfersKey" v-else-if="element.action.special === 'stops.transfers'">
                                     <SimpleTable :fields="divers.transferFields" :items="divers.transferItems" :move="null" />
@@ -234,6 +219,7 @@
 </template>
 
 <script>
+    import SimpleMap from './components/SimpleMap.vue'
     import SimpleTable from './components/SimpleTable.vue'
     import SimpleTree from './components/SimpleTree.vue'
     import Texter from './components/Texter.vue'
@@ -1172,18 +1158,51 @@
             /** @type {!Number} */
             this.key = 0;
 
+             /** @type {!Array.<!String>} */
+            this.stationFields = [ 'stop_id', 'stop_name', 'location_type', 'platform_code', '__action' ];
+
             /** @type {!Function} */
-            this.stationDeleter = record => {
-                record.__delete();
-                this.update('tree');
-                this.stationKey += 1;
+            this.stationHandler = (type, object) => {
+                switch (type) {
+                    case 'delete':
+                        object.__delete();
+                        this.update('tree');
+                        this.stationKey += 1;
+                        break;
+                    case 'refresh':
+                        this.stationKey += 1;
+                        break;
+                    default:
+                        break;
+                }
             };
 
             /** @type {!Number} */
             this.stationKey = 1000;
 
+            /** @type {!Function} */
+            this.stationAddFields = () => [ 'stop_id', 'stop_name', 'location_type', 'platform_code', 'parent_station', '__action' ];
+
+            /** @type {!Function} */
+            this.stationAddItems = () => {
+                const shadow = this.dataset.get('stops').shadowRecord;
+                shadow.__delete();
+                shadow['parent_station'].set(this.record['stop_id'].get());
+                return [ shadow ];
+            };
+
+            /** @type {!Function} */
+            this.stationAddRefresh = () => {
+                this.update('tree');
+                this.stationKey += 1;
+                this.stationAddKey + 1;
+            };
+
             /** @type {!Number} */
-            this.mapKey = 2000;
+            this.stationAddKey = 2000;
+
+            /** @type {!Number} */
+            this.mapKey = 3000;
 
             /** @type {!Function} */
             this.transferFields = () => [ 'from_stop_id', 'to_stop_id', 'transfer_type', 'min_transfer_time', '__action' ];
@@ -1199,7 +1218,7 @@
             };
 
             /** @type {!Number} */
-            this.transfersKey = 3000;
+            this.transfersKey = 4000;
 
             /** @type {!Function} */
             this.pathwayFields = () => [ 'from_stop_id', 'to_stop_id', 'pathway_mode', 'is_bidirectional', 'length', 'traversal_time', 'stair_count', '__action' ];
@@ -1215,7 +1234,7 @@
             };
 
             /** @type {!Number} */
-            this.pathwaysKey = 4000;
+            this.pathwaysKey = 5000;
 
             this.afterConstructed();
         }
@@ -1225,20 +1244,14 @@
                 key: 'station-row-1',
                 data: [
                     { action: { icon: null, text: null, special: 'stops.station' }, colspan: 1, rowspan: 1 },
-                    { action: { icon: null, text: null, special: 'stops.map' }, colspan: 1, rowspan: 2 },
+                    { action: { icon: null, text: null, special: 'stops.map' }, colspan: 1, rowspan: 2 }
                 ]
             });
-            const createChildStop = {
-                callback: () => {
-                    console.log('Ooops...'); // TODO
-                },
-                icon: null,
-                text: 'New'
-            };
+
             this.mockups.find(mockup => mockup.title === 'Station').table.push({
                 key: 'station-row-2',
                 data: [
-                    { action: createChildStop, colspan: 1, entry: null, label: null, rowspan: 1 }
+                    { action: { icon: null, text: null, special: 'stops.station_add' }, colspan: 1, rowspan: 1 }
                 ]
             });
 
@@ -1256,14 +1269,14 @@
                 data: [
                     { action: null, colspan: 1, entry: this.record['location_type'], label: 'Type', rowspan: 1 },
                     { action: null, colspan: 2, entry: this.record['parent_station'], label: 'Parent Station', rowspan: 1 },
-                    { action: null, colspan: 2, entry: this.record['stop_desc'], label: 'Description', rowspan: 2 },
+                    { action: null, colspan: 2, entry: this.record['stop_desc'], label: 'Description', rowspan: 2 }
                 ]
             });
             this.mockups.find(mockup => mockup.title === 'Stop').table.push({
                 key: 'stop-row-3',
                 data: [
                     { action: null, colspan: 1, entry: this.record['stop_code'], label: 'Stop Code', rowspan: 1 },
-                    { action: null, colspan: 2, entry: this.record['level_id'], label: 'Level ID', rowspan: 1 },
+                    { action: null, colspan: 2, entry: this.record['level_id'], label: 'Level ID', rowspan: 1 }
                 ]
             });
             this.mockups.find(mockup => mockup.title === 'Stop').table.push({
@@ -1664,6 +1677,7 @@
     export default {
         name: 'App',
         components: {
+            SimpleMap,
             SimpleTable,
             SimpleTree,
             Texter
