@@ -1,5 +1,5 @@
 <template>
-    <div id="simple-map">
+    <div id="simple-map" :key="mainKey">
         Ooops! I should be a map!
         <br />
         (but I have a full api...)
@@ -18,6 +18,8 @@
 
         data() {
             return {
+                /** @type {!Number} */
+                mainKey: 0,
                 /** @type {!Number} */
                 markedIndex: 0
             };
@@ -94,6 +96,7 @@
                 }
                 this.data[index]['stop_lat'].set(position.lat.toString());
                 this.data[index]['stop_lon'].set(position.lon.toString());
+                this.mainKey += 1;
                 return true;
             }
         }
@@ -102,11 +105,11 @@
 
 <style scoped>
     #simple-map {
-        background-color: white;
-        border: 2px solid #888;
-        display: block;
-        height: 333px;
-        width: 333px;
+        bottom: 0;
+        left: 0;
+        position: absolute;
+        right: 0;
         text-align: center;
+        top: 0;
     }
 </style>

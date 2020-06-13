@@ -52,10 +52,6 @@
 </script>
 
 <style scoped>
-    .centered {
-        display: block;
-        text-align: center;
-    }
     .popup {
         background-color: rgba(0, 0, 0, 0.4);
         height: 100%;

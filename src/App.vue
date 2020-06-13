@@ -70,12 +70,12 @@
                 fixed hover small striped
             >
                 <template v-slot:head()="data">
-                    <span v-b-tooltip.hover="{ placement: 'bottom', title: data.label }" v-if="data.label.length != 0">
+                    <fragment v-b-tooltip.hover="{ placement: 'bottom', title: data.label }" v-if="data.label.length != 0">
                         {{ table.formator(data.column) }}
-                    </span>
-                    <span v-else>
+                    </fragment>
+                    <fragment v-else>
                         {{ table.formator(data.column) }}
-                    </span>
+                    </fragment>
                 </template>
                 <template v-slot:cell()="data">
                     <span class="centered" v-if="data.value.record === undefined">
@@ -90,25 +90,25 @@
                             v-else
                         />
                     </span>
-                    <span v-else-if="table.callback !== null">
+                    <fragment v-else-if="table.callback !== null">
                         <b-form-input :value="data.value.get()" size="sm" disabled />
-                    </span>
-                    <span v-else-if="data.value.isChild()">
+                    </fragment>
+                    <fragment v-else-if="data.value.isChild()">
                         <b-form-select :value="data.value.get()" size="sm" @change="data.value.set($event)">
                             <b-form-select-option :value="''" />
                             <option v-for="parent in data.value.getPossibleParents()" :key="parent.get()">
                                 {{ parent.get() }}
                             </option>
                         </b-form-select>
-                    </span>
-                    <span v-else-if="data.value.isEnumeration()">
+                    </fragment>
+                    <fragment v-else-if="data.value.isEnumeration()">
                         <b-form-select :value="data.value.get()" size="sm" @change="data.value.set($event)">
                             <option v-for="value in data.value.getEnumerationValues()" :key="value">
                                 {{ value }}
                             </option>
                         </b-form-select>
-                    </span>
-                    <span v-else>
+                    </fragment>
+                    <fragment v-else>
                         <b-form-input
                             :pattern="data.value.fieldType.structure.getInputPattern()"
                             :type="data.value.fieldType.structure.getInputType()"
@@ -116,7 +116,7 @@
                             @change="data.value.set($event)"
                             size="sm"
                         />
-                    </span>
+                    </fragment>
                 </template>
             </b-table>
             <b-pagination aria-controls="table"
@@ -128,16 +128,16 @@
         </div>
         <div :key="divers.key" v-if="divers !== null">
             <b-card v-for="mockup in divers.mockups" :key="mockup.title" :title="mockup.title">
-                <b-table-simple class="mockup-table">
+                <b-table-simple fixed small>
                     <b-tr v-for="row in mockup.table" :key="row.title">
                         <b-td v-for="(element, index) in row.data" :key="row.title + '-element' + index"
                             :colspan="element.colspan"
                             :rowspan="element.rowspan"
                         >
-                            <span class="mockup-label">
+                            <fragment>
                                 {{ typeof element.label === 'string' ? element.label : '' }}
-                            </span>
-                            <span v-if="element.action !== null">
+                            </fragment>
+                            <fragment v-if="element.action !== null">
                                 <br v-if="element.label === null" />
                                 <b-icon :icon="element.action.icon"
                                     @click="element.action.callback()"
@@ -171,40 +171,51 @@
                                         :root="divers.tree"
                                     />
                                 </span>
-                                <span :key="divers.mapKey" v-else-if="element.action.special === 'stops.map'">
+                                <div id="map" :key="divers.mapKey" v-else-if="element.action.special === 'stops.map'">
                                     <SimpleMap :data="divers.tree.flat()" :refreshParent="divers.stationRefresh" />
-                                </span>
+                                </div>
                                 <span :key="divers.transfersKey" v-else-if="element.action.special === 'stops.transfers'">
                                     <SimpleTable :fields="divers.transferFields" :items="divers.transferItems" :move="null" />
                                 </span>
                                 <span :key="divers.pathwaysKey" v-else-if="element.action.special === 'stops.pathways'">
                                     <SimpleTable :fields="divers.pathwayFields" :items="divers.pathwayItems" :move="null" />
                                 </span>
-                            </span>
-                            <span v-else-if="element.entry.isChild()">
-                                <b-form-select class="mockup-input" :value="element.entry.get()" @change="divers.set(element.entry, $event)" size="sm">
+                            </fragment>
+                            <fragment v-else-if="element.entry.isChild()">
+                                <b-form-select :value="element.entry.get()" @change="divers.set(element.entry, $event)" size="sm">
                                     <b-form-select-option :value="''" />
                                     <option v-for="parent in element.entry.getPossibleParents()" :key="parent.get()">
                                         {{ parent.get() }}
                                     </option>
                                 </b-form-select>
-                            </span>
-                            <span v-else-if="element.entry.isEnumeration()">
-                                <b-form-select class="mockup-input" :value="element.entry.get()" @change="divers.set(element.entry, $event)" size="sm">
+                            </fragment>
+                            <fragment v-else-if="element.entry.isEnumeration()">
+                                <b-form-select :value="element.entry.get()" @change="divers.set(element.entry, $event)" size="sm">
                                     <option v-for="value in element.entry.getEnumerationValues()" :key="value">
                                         {{ value }}
                                     </option>
                                 </b-form-select>
-                            </span>
-                            <span v-else>
-                                <b-form-input class="mockup-input"
+                            </fragment>
+                            <fragment v-else-if="element.rowspan == 1">
+                                <b-form-input
                                     :pattern="element.entry.fieldType.structure.getInputPattern()"
                                     :type="element.entry.fieldType.structure.getInputType()"
                                     :value="element.entry.get()"
                                     @change="divers.set(element.entry, $event)"
                                     size="sm"
                                 />
-                            </span>
+                            </fragment>
+                            <fragment v-else>
+                                <b-form-textarea
+                                    :pattern="element.entry.fieldType.structure.getInputPattern()"
+                                    :rows="2 * element.rowspan - 1"
+                                    :max-rows="2 * element.rowspan - 1"
+                                    :type="element.entry.fieldType.structure.getInputType()"
+                                    :value="element.entry.get()"
+                                    @change="divers.set(element.entry, $event)"
+                                    size="sm"
+                                />
+                            </fragment>
                         </b-td>
                     </b-tr>
                 </b-table-simple>
@@ -297,7 +308,6 @@
             node.children.forEach(child => data = __flat(child, data));
             return data;
         };
-        console.log(__flat());
         return { contains: __contains, data: __data, field: 'parent_station', flat: __flat };
     }
 
@@ -1173,6 +1183,7 @@
                 switch (type) {
                     case 'add':
                         shadow.__file.addShadowRecord();
+                        shadow['stop_name'].set(this.record['stop_name'].get());
                         shadow['parent_station'].set(this.record['stop_id'].get());
                         this.update('tree');
                         this.stationKey += 1;
@@ -1191,6 +1202,7 @@
                         return;
                 }
             };
+            this.dataset.get('stops').shadowRecord.__delete();
 
             /** @type {!Number} */
             this.stationKey = 1000;
@@ -1242,7 +1254,7 @@
             this.mockups.find(mockup => mockup.title === 'Station').table.push({
                 key: 'station-row-1',
                 data: [
-                    { action: { icon: null, text: null, special: 'stops.station' }, colspan: 1, rowspan: 1 },
+                    { action: { icon: null, text: null, special: 'stops.station' }, colspan: 2, rowspan: 1 },
                     { action: { icon: null, text: null, special: 'stops.map' }, colspan: 1, rowspan: 1 }
                 ]
             });
@@ -1295,8 +1307,6 @@
                 ]
             });
 
-            this.dataset.get('stops').shadowRecord.__delete();
-            this.dataset.get('stops').shadowRecord['parent_station'].set(this.record['stop_id'].get());
             this.update('full');
         }
 
@@ -1304,8 +1314,12 @@
          * @param {!String} updateKey
          */
         update(updateKey) {
+            const shadowRecord = this.dataset.get('stops').shadowRecord;
+
             switch (updateKey) {
                 case 'full':
+                    shadowRecord['stop_name'].set(this.record['stop_name'].get());
+                    shadowRecord['parent_station'].set(this.record['stop_id'].get());
                     // fallsthrough
                 case 'tree':
                     this.tree = gtfsStopTree(this.record);
@@ -1320,11 +1334,20 @@
 
         /**
          * @param {!Entry} entry
-         * @param {!String} data
+         * @param {!String|!Record} data
          */
         set(entry, data) {
+            if (typeof data === 'string') {
+                data = data.replace('\n', ' ');
+            }
             if (entry.set(data) && !entry.record.__isShadow) {
                 switch (entry.field.getFullIdentifier()) {
+                    case 'stops.stop_id':
+                        // fallsthrough
+                    case 'stops.stop_name':
+                        this.update('full');
+                        this.key += 1;
+                        break;
                     default:
                         break;
                 }
@@ -1455,7 +1478,7 @@
                 key: 'route-row-1',
                 data: [
                     { action: null, colspan: 1, entry: this.record['route_id'], label: 'Route ID', rowspan: 1 },
-                    { action: createRoute, colspan: 2, entry: null, label: null, rowspan: 1 }
+                    { action: createRoute, colspan: 3, entry: null, label: null, rowspan: 1 }
                 ]
             });
 
@@ -1516,7 +1539,7 @@
                             data: [
                                 { action: null, colspan: 1, entry: route['agency_id'], label: 'Agency ID', rowspan: 1 },
                                 { action: null, colspan: 1, entry: route['route_short_name'], label: 'Short Name', rowspan: 1 },
-                                { action: null, colspan: 1, entry: route['route_long_name'], label: 'Long Name', rowspan: 1 }
+                                { action: null, colspan: 2, entry: route['route_long_name'], label: 'Long Name', rowspan: 1 }
                             ]
                         });
                         routeTable.push({
@@ -1524,7 +1547,7 @@
                             data: [
                                 { action: null, colspan: 1, entry: route['route_type'], label: 'Type', rowspan: 1 },
                                 { action: null, colspan: 1, entry: route['route_sort_order'], label: 'Sort Order', rowspan: 1 },
-                                { action: null, colspan: 1, entry: route['route_desc'], label: 'Description', rowspan: 2 }
+                                { action: null, colspan: 2, entry: route['route_desc'], label: 'Description', rowspan: 2 }
                             ]
                         });
                         routeTable.push({
@@ -1539,7 +1562,7 @@
                             data: [
                                 { action: null, colspan: 1, entry: route['continuous_pickup'], label: 'Continuous Pickup', rowspan: 1 },
                                 { action: null, colspan: 1, entry: route['continuous_drop_off'], label: 'Continuous Drop Off', rowspan: 1 },
-                                { action: null, colspan: 1, entry: route['route_url'], label: 'URL', rowspan: 1 }
+                                { action: null, colspan: 2, entry: route['route_url'], label: 'URL', rowspan: 1 }
                             ]
                         });
                     }
@@ -1630,9 +1653,12 @@
         }
         /**
          * @param {!Entry} entry
-         * @param {!String} data
+         * @param {!String|!Record} data
          */
         set(entry, data) {
+            if (typeof data === 'string') {
+                data = data.replace('\n', ' ');
+            }
             if (entry.set(data) && !entry.record.__isShadow) {
                 switch (entry.field.getFullIdentifier()) {
                     case 'trips.route_id':
@@ -1823,5 +1849,18 @@
 <style>
     #open-input {
         display: none;
+    }
+
+    #map {
+        background-color: rgb(255, 255, 255);
+        border: 2px solid #888;
+        padding-top: 100%;
+        position: relative;
+        width: 100%;
+    }
+
+    .centered {
+        display: block;
+        text-align: center;
     }
 </style>
