@@ -128,9 +128,9 @@
         </div>
         <div :key="divers.key" v-if="divers !== null">
             <b-card v-for="mockup in divers.mockups" :key="mockup.title" :title="mockup.title">
-                <table class="mockup-table">
-                    <tr v-for="row in mockup.table" :key="row.title">
-                        <td v-for="(element, index) in row.data" :key="row.title + '-element' + index"
+                <b-table-simple class="mockup-table">
+                    <b-tr v-for="row in mockup.table" :key="row.title">
+                        <b-td v-for="(element, index) in row.data" :key="row.title + '-element' + index"
                             :colspan="element.colspan"
                             :rowspan="element.rowspan"
                         >
@@ -155,7 +155,7 @@
                                         :columns="$screens({ default: 1, lg: 4 })"
                                         :rows="$screens({ default: 1, lg: 1 })"
                                         v-model="pickerDate"
-                                        is-inline
+                                        is-expanded is-inline
                                     />
                                 </span>
                                 <span :key="divers.stopsKey" v-else-if="element.action.special === 'trips.stop_times'">
@@ -165,14 +165,10 @@
                                     <SimpleTable :fields="divers.frequencyFields" :items="divers.frequencyItems" :move="null" />
                                 </span>
                                 <span :key="divers.stationKey" v-else-if="element.action.special === 'stops.station'">
-                                    <SimpleTree :fields="divers.stationFields" :handler="divers.stationHandler" :root="divers.tree.data" />
-                                </span>
-                                <span :key="divers.stationAddKey" v-else-if="element.action.special === 'stops.station_add'">
-                                    <SimpleTable
-                                        :fields="divers.stationAddFields"
-                                        :items="divers.stationAddItems"
-                                        :move="null"
-                                        :refresh="divers.stationAddRefresh"
+                                    <SimpleTree
+                                        :fields="divers.stationFields"
+                                        :handler="divers.stationHandler"
+                                        :root="divers.tree"
                                     />
                                 </span>
                                 <span :key="divers.mapKey" v-else-if="element.action.special === 'stops.map'">
@@ -209,9 +205,9 @@
                                     size="sm"
                                 />
                             </span>
-                        </td>
-                    </tr>
-                </table>
+                        </b-td>
+                    </b-tr>
+                </b-table-simple>
             </b-card>
         </div>
         <Texter :wrapper="texterWrapper" @close="closeTexter()" v-if="texterWrapper !== null" />
@@ -267,7 +263,7 @@
     }
     /**
      * @param {!Record} stop
-     * @returns {?{ contains: !Function, data: { record: !Record, children: !Array.<!Object>, isOpened: !Boolean } }}
+     * @returns {?{ contains: !Function, data: { record: !Record, children: !Array.<!Object>, isOpened: !Boolean }, field: !String }}
      */
     function gtfsStopTree(stop) {
         if (stop.__file.identifier !== 'stops') {
@@ -292,7 +288,7 @@
             }
             return false;
         };
-        return { contains: __contains, data: __data };
+        return { contains: __contains, data: __data, field: 'parent_station' };
     }
 
     /**
@@ -1163,46 +1159,34 @@
 
             /** @type {!Function} */
             this.stationHandler = (type, object) => {
+                const shadow = this.dataset.get('stops').shadowRecord;
                 switch (type) {
+                    case 'add':
+                        shadow.__file.addShadowRecord();
+                        shadow['parent_station'].set(this.record['stop_id'].get());
+                        this.update('tree');
+                        this.stationKey += 1;
+                        return;
                     case 'delete':
                         object.__delete();
                         this.update('tree');
                         this.stationKey += 1;
-                        break;
+                        return;
                     case 'refresh':
                         this.stationKey += 1;
-                        break;
+                        return;
+                    case 'shadow':
+                        return shadow;
                     default:
-                        break;
+                        return;
                 }
             };
 
             /** @type {!Number} */
             this.stationKey = 1000;
 
-            /** @type {!Function} */
-            this.stationAddFields = () => [ 'stop_id', 'stop_name', 'location_type', 'platform_code', 'parent_station', '__action' ];
-
-            /** @type {!Function} */
-            this.stationAddItems = () => {
-                const shadow = this.dataset.get('stops').shadowRecord;
-                shadow.__delete();
-                shadow['parent_station'].set(this.record['stop_id'].get());
-                return [ shadow ];
-            };
-
-            /** @type {!Function} */
-            this.stationAddRefresh = () => {
-                this.update('tree');
-                this.stationKey += 1;
-                this.stationAddKey + 1;
-            };
-
             /** @type {!Number} */
-            this.stationAddKey = 2000;
-
-            /** @type {!Number} */
-            this.mapKey = 3000;
+            this.mapKey = 2000;
 
             /** @type {!Function} */
             this.transferFields = () => [ 'from_stop_id', 'to_stop_id', 'transfer_type', 'min_transfer_time', '__action' ];
@@ -1218,7 +1202,7 @@
             };
 
             /** @type {!Number} */
-            this.transfersKey = 4000;
+            this.transfersKey = 3000;
 
             /** @type {!Function} */
             this.pathwayFields = () => [ 'from_stop_id', 'to_stop_id', 'pathway_mode', 'is_bidirectional', 'length', 'traversal_time', 'stair_count', '__action' ];
@@ -1234,7 +1218,7 @@
             };
 
             /** @type {!Number} */
-            this.pathwaysKey = 5000;
+            this.pathwaysKey = 4000;
 
             this.afterConstructed();
         }
@@ -1244,14 +1228,7 @@
                 key: 'station-row-1',
                 data: [
                     { action: { icon: null, text: null, special: 'stops.station' }, colspan: 1, rowspan: 1 },
-                    { action: { icon: null, text: null, special: 'stops.map' }, colspan: 1, rowspan: 2 }
-                ]
-            });
-
-            this.mockups.find(mockup => mockup.title === 'Station').table.push({
-                key: 'station-row-2',
-                data: [
-                    { action: { icon: null, text: null, special: 'stops.station_add' }, colspan: 1, rowspan: 1 }
+                    { action: { icon: null, text: null, special: 'stops.map' }, colspan: 1, rowspan: 1 }
                 ]
             });
 
@@ -1312,6 +1289,8 @@
         update(updateKey) {
             switch (updateKey) {
                 case 'full':
+                    this.dataset.get('stops').shadowRecord.__delete();
+                    this.dataset.get('stops').shadowRecord['parent_station'].set(this.record['stop_id'].get());
                     // fallsthrough
                 case 'tree':
                     this.tree = gtfsStopTree(this.record);
