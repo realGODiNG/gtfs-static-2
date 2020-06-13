@@ -172,7 +172,7 @@
                                     />
                                 </span>
                                 <span :key="divers.mapKey" v-else-if="element.action.special === 'stops.map'">
-                                    <SimpleMap :root="divers.tree.data" />
+                                    <SimpleMap :data="divers.tree.flat()" :refreshParent="divers.stationRefresh" />
                                 </span>
                                 <span :key="divers.transfersKey" v-else-if="element.action.special === 'stops.transfers'">
                                     <SimpleTable :fields="divers.transferFields" :items="divers.transferItems" :move="null" />
@@ -263,7 +263,7 @@
     }
     /**
      * @param {!Record} stop
-     * @returns {?{ contains: !Function, data: { record: !Record, children: !Array.<!Object>, isOpened: !Boolean }, field: !String }}
+     * @returns {?{ contains: !Function, data: { record: !Record, children: !Array.<!Object>, isOpened: !Boolean }, field: !String, flat: !Function }}
      */
     function gtfsStopTree(stop) {
         if (stop.__file.identifier !== 'stops') {
@@ -288,7 +288,17 @@
             }
             return false;
         };
-        return { contains: __contains, data: __data, field: 'parent_station' };
+        const __flat = (node, data) => {
+            if (node === undefined) {
+                node = __data;
+                data = new Array();
+            }
+            data.push(node.record);
+            node.children.forEach(child => data = __flat(child, data));
+            return data;
+        };
+        console.log(__flat());
+        return { contains: __contains, data: __data, field: 'parent_station', flat: __flat };
     }
 
     /**
@@ -1185,6 +1195,11 @@
             /** @type {!Number} */
             this.stationKey = 1000;
 
+            this.stationRefresh = () => {
+                this.update('full');
+                this.key += 1;
+            }
+
             /** @type {!Number} */
             this.mapKey = 2000;
 
@@ -1280,6 +1295,8 @@
                 ]
             });
 
+            this.dataset.get('stops').shadowRecord.__delete();
+            this.dataset.get('stops').shadowRecord['parent_station'].set(this.record['stop_id'].get());
             this.update('full');
         }
 
@@ -1289,8 +1306,6 @@
         update(updateKey) {
             switch (updateKey) {
                 case 'full':
-                    this.dataset.get('stops').shadowRecord.__delete();
-                    this.dataset.get('stops').shadowRecord['parent_station'].set(this.record['stop_id'].get());
                     // fallsthrough
                 case 'tree':
                     this.tree = gtfsStopTree(this.record);
