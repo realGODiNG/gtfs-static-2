@@ -22,6 +22,9 @@
                         <b-icon icon="trash" @click="__delete(data.item)" />
                     </fragment>
                 </span>
+                <fragment v-else-if="__needsStopID(data.value)">
+                    <b-form-input type="text" :value="data.value.get()" @click="childStopEntry = data.value" size="sm" />
+                </fragment>
                 <fragment v-else-if="data.value.isChild()">
                     <b-form-select :value="data.value.get()" size="sm" @change="data.value.set($event)">
                         <b-form-select-option :value="''" />
@@ -48,24 +51,39 @@
                 </fragment>
             </template>
         </b-table>
+        <SimpleStop :entry="childStopEntry"
+            :setter="__set"
+            :trees="gtfsStopTrees(childStopEntry)"
+            @close="childStopEntry = null"
+            v-if="childStopEntry !== null"
+        />
     </div>
 </template>
 
 <script>
+    import SimpleStop from './SimpleStop'
+
     export default {
         name: 'SimpleTable',
+        components: {
+            SimpleStop
+        },
 
         data() {
             return {
+                /** @type {?Entry} */
+                childStopEntry: null,
+
                 /** @type {!Number} */
-                mainKey: 0
+                mainKey: 0,
             };
         },
         props: {
             'fields': Function,
             'items': Function,
             'move': Function,
-            'refresh': Function
+            'refresh': Function,
+            'gtfsStopTrees': Function
         },
 
         methods: {
@@ -87,6 +105,37 @@
                 if (this.refresh !== undefined) {
                     this.refresh();
                 }
+                this.mainKey += 1;
+            },
+            /**
+             * @param {!Entry} entry
+             * @returns {!Boolean}
+             */
+            __needsStopID(entry) {
+                if (entry.record.__isShadow) {
+                    return false;
+                }
+                switch (entry.field.getFullIdentifier()) {
+                    case 'stop_times.stop_id':
+                        // fallsthrough
+                    case 'transfers.from_stop_id':
+                        // fallsthrough
+                    case 'transfers.to_stop_id':
+                        // fallsthrough
+                    case 'pathways.from_stop_id':
+                        // fallsthrough
+                    case 'pathways.to_stop_id':
+                        return true;
+                    default:
+                        return false;
+                }
+            },
+            /**
+             * @param {!Entry} entry
+             * @param {!String|!Entry} data
+             */
+            __set(entry, data) {
+                entry.set(data);
                 this.mainKey += 1;
             }
         }

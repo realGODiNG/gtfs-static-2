@@ -20,6 +20,7 @@
             return {
                 /** @type {!Number} */
                 mainKey: 0,
+                
                 /** @type {!Number} */
                 markedIndex: 0
             };

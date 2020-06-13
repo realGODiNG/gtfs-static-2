@@ -159,10 +159,14 @@
                                     />
                                 </span>
                                 <span :key="divers.stopsKey" v-else-if="element.action.special === 'trips.stop_times'">
-                                    <SimpleTable :fields="divers.stopFields" :items="divers.stopItems" :move="divers.stopMove" />
+                                    <SimpleTable :fields="divers.stopFields" :items="divers.stopItems" :move="divers.stopMove"
+                                        :gtfsStopTrees="gtfsStopTrees"
+                                    />
                                 </span>
                                 <span :key="divers.frequenciesKey" v-else-if="element.action.special === 'trips.frequencies'">
-                                    <SimpleTable :fields="divers.frequencyFields" :items="divers.frequencyItems" :move="null" />
+                                    <SimpleTable :fields="divers.frequencyFields" :items="divers.frequencyItems" :move="null"
+                                        :gtfsStopTrees="gtfsStopTrees"
+                                    />
                                 </span>
                                 <span :key="divers.stationKey" v-else-if="element.action.special === 'stops.station'">
                                     <SimpleTree
@@ -175,11 +179,18 @@
                                     <SimpleMap :data="divers.tree.flat()" :refreshParent="divers.stationRefresh" />
                                 </div>
                                 <span :key="divers.transfersKey" v-else-if="element.action.special === 'stops.transfers'">
-                                    <SimpleTable :fields="divers.transferFields" :items="divers.transferItems" :move="null" />
+                                    <SimpleTable :fields="divers.transferFields" :items="divers.transferItems" :move="null"
+                                        :gtfsStopTrees="gtfsStopTrees"
+                                    />
                                 </span>
                                 <span :key="divers.pathwaysKey" v-else-if="element.action.special === 'stops.pathways'">
-                                    <SimpleTable :fields="divers.pathwayFields" :items="divers.pathwayItems" :move="null" />
+                                    <SimpleTable :fields="divers.pathwayFields" :items="divers.pathwayItems" :move="null"
+                                        :gtfsStopTrees="gtfsStopTrees"
+                                    />
                                 </span>
+                                <fragment v-else-if="element.action.special === 'stops.stop_picker'">
+                                    <b-form-input type="text" :value="element.entry.get()" @click="childStopEntry = element.entry" size="sm" />
+                                </fragment>
                             </fragment>
                             <fragment v-else-if="element.entry.isChild()">
                                 <b-form-select :value="element.entry.get()" @change="divers.set(element.entry, $event)" size="sm">
@@ -221,12 +232,19 @@
                 </b-table-simple>
             </b-card>
         </div>
-        <Texter :wrapper="texterWrapper" @close="closeTexter()" v-if="texterWrapper !== null" />
+        <SimpleStop :entry="childStopEntry"
+            :setter="divers.set"
+            :trees="gtfsStopTrees(childStopEntry)"
+            @close="childStopEntry = null"
+            v-if="divers !== null && childStopEntry !== null"
+        />
+        <Texter :wrapper="texterWrapper" @close="texterWrapper = null" v-if="texterWrapper !== null" />
     </div>
 </template>
 
 <script>
     import SimpleMap from './components/SimpleMap.vue'
+    import SimpleStop from './components/SimpleStop.vue'
     import SimpleTable from './components/SimpleTable.vue'
     import SimpleTree from './components/SimpleTree.vue'
     import Texter from './components/Texter.vue'
@@ -273,18 +291,26 @@
         return split;
     }
     /**
-     * @param {!Record} stop
+     * @param {!Record} record
+     * @param {!Boolean} onlyStations
      * @returns {?{ contains: !Function, data: { record: !Record, children: !Array.<!Object>, isOpened: !Boolean }, field: !String, flat: !Function }}
      */
-    function gtfsStopTree(stop) {
-        if (stop.__file.identifier !== 'stops') {
+    function gtfsStopTree(record, onlyStations) {
+        if (record.__file.identifier !== 'stops') {
             return null;
         }
+        const station = record.__file.get('location_type').types[0].enumeration.toHTML('1');
+        const stop = record.__file.get('location_type').types[0].enumeration.toHTML('0');
         const getTreeData = parent => {
-            const nodes = parent['stop_id'].children.filter(child => child.field.file.identifier === 'stops').map(entry => getTreeData(entry.record));
+            const nodes = parent['stop_id'].children.filter(child => {
+                return onlyStations
+                    ? child.field.file.identifier === 'stops'
+                        && (child.record['location_type'].get() === station || child.record['location_type'].get() === stop)
+                    : child.field.file.identifier === 'stops';
+            }).map(entry => getTreeData(entry.record));
             return { record: parent, children: nodes, isOpened: nodes.length != 0 };
         };
-        const __data = getTreeData(stop);
+        const __data = getTreeData(record);
         const __contains = (stopID, node) => {
             if (node === undefined) {
                 node = __data;
@@ -1272,7 +1298,13 @@
                 key: 'stop-row-2',
                 data: [
                     { action: null, colspan: 1, entry: this.record['location_type'], label: 'Type', rowspan: 1 },
-                    { action: null, colspan: 2, entry: this.record['parent_station'], label: 'Parent Station', rowspan: 1 },
+                    {
+                        action: { icon: null, text: null, special: 'stops.stop_picker' },
+                        colspan: 2,
+                        entry: this.record['parent_station'],
+                        label: 'Parent Station',
+                        rowspan: 1
+                    },
                     { action: null, colspan: 2, entry: this.record['stop_desc'], label: 'Description', rowspan: 2 }
                 ]
             });
@@ -1322,7 +1354,7 @@
                     shadowRecord['parent_station'].set(this.record['stop_id'].get());
                     // fallsthrough
                 case 'tree':
-                    this.tree = gtfsStopTree(this.record);
+                    this.tree = gtfsStopTree(this.record, false);
                     if (updateKey !== 'full') {
                         break;
                     }
@@ -1698,6 +1730,7 @@
         name: 'App',
         components: {
             SimpleMap,
+            SimpleStop,
             SimpleTable,
             SimpleTree,
             Texter
@@ -1705,6 +1738,9 @@
 
         data() {
             return {
+                /** @type {?Entry} */
+                childStopEntry: null,
+
                 /** @type {?{ callback: !Function, title: !String }} */
                 texterWrapper: null,
 
@@ -1779,6 +1815,7 @@
                 this.station = null;
                 this.trip = null;
                 const station = this.dataset.get('stops').get('location_type').types[0].enumeration.toHTML('1');
+                const stop = this.dataset.get('stops').get('location_type').types[0].enumeration.toHTML('0');
                 switch(fileIdentifier) {
                     case '__stops':
                         this.table = new Table(
@@ -1786,7 +1823,10 @@
                              'stops',
                             [ 'stop_id', 'stop_code', 'stop_name', 'stop_desc', 'stop_lat', 'stop_lon' ],
                             this.selectStation,
-                            record => !record['stop_id'].isEmpty() && record['location_type'].get() === station
+                            record => !record['stop_id'].isEmpty() && (
+                                    record['location_type'].get() === station ||
+                                    (record['location_type'].get() === stop && record['parent_station'].isEmpty())
+                                )
                         );
                         break;
                     case '__trips':
@@ -1839,8 +1879,27 @@
                 this.divers = this.trip;
             },
 
-            closeTexter() {
-                this.texterWrapper = null;
+            /**
+             * @param {!Entry} childStopEntry
+             * @returns {!Array.<!Object>}
+             */
+            gtfsStopTrees(childStopEntry) {
+                const trees = new Array();
+                if (childStopEntry instanceof Entry) {
+                    const childStop = childStopEntry.record;
+                    const onlyStations = childStopEntry.field.file.identifier === 'stops' || childStopEntry.field.file.identifier === 'trips';
+                    const station = this.dataset.get('stops').get('location_type').types[0].enumeration.toHTML('1');
+                    const stop = this.dataset.get('stops').get('location_type').types[0].enumeration.toHTML('0');
+                    this.dataset.get('stops').records.forEach(record => {
+                        if (!childStop.__isEqual(record)) {
+                            const isStation = record['location_type'].get() === station || record['location_type'].get() === stop;
+                            if (record['parent_station'].isEmpty() && (!onlyStations || isStation)) {
+                                trees.push(gtfsStopTree(record, onlyStations));
+                            }
+                        }
+                    });
+                }  
+                return trees;
             }
         }
     }
@@ -1862,5 +1921,26 @@
     .centered {
         display: block;
         text-align: center;
+    }
+
+    .popup {
+        background-color: rgba(0, 0, 0, 0.4);
+        height: 100%;
+        left: 0;
+        overflow: auto;
+        position: fixed;
+        top: 0;
+        width: 100%;
+        z-index: 100;
+    }
+    .popup-content {
+        background-color: white;
+        border: 2px solid #888;
+        left: 50%;
+        position: absolute;
+        top: 50%;
+        width: fit-content;
+        -ms-transform: translate(-50%, -50%);
+        transform: translate(-50%, -50%);
     }
 </style>

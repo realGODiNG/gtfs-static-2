@@ -6,6 +6,9 @@
                     <b-th v-for="field in fields" :key="field">
                         {{ format(field) }}
                     </b-th>
+                    <b-th v-if="!__hasShadow()">
+                        Select
+                    </b-th>
                 </b-tr>
             </b-thead>
             <b-tbody>
@@ -13,7 +16,17 @@
                 <b-tr v-if="__hasShadow()">
                     <b-td v-for="(entry, index) in __getShadowEntries()" :key="'shadow-' + index">
                         <span v-if="entry !== undefined">
-                            <fragment v-if="entry.isChild()">
+                            <fragment v-if="index == fields.length - 1">
+                                <b-form-select :value="entry.get()" size="sm" @change="entry.set($event)">
+                                    <option v-for="parent in root.flat().map(record => record['stop_id'])" :key="parent.get()">
+                                        {{ parent.get() }}
+                                    </option>
+                                </b-form-select>
+                            <span class="centered">
+                                <b-icon icon="plus" @click="handler('add')" />
+                            </span>
+                            </fragment>
+                            <fragment v-else-if="entry.isChild()">
                                 <b-form-select :value="entry.get()" size="sm" @change="entry.set($event)">
                                     <b-form-select-option :value="''" />
                                     <option v-for="parent in entry.getPossibleParents()" :key="parent.get()">
@@ -37,12 +50,13 @@
                                     size="sm"
                                 />
                             </fragment>
-                            <span class="centered" v-if="index == fields.length - 1">
-                                <b-icon icon="plus" @click="handler('add')" />
-                            </span>
                         </span>
                     </b-td>
                 </b-tr>
+                <SimpleTree v-for="(tree, index) in trees" :key="'tree-' + index"
+                    :depth="0" :fields="fields" :handler="handler" :isRendered="true" :root="tree.data"
+                    v-else-if="trees !== undefined"
+                />
             </b-tbody>
         </b-table-simple>
         <fragment v-else>
@@ -68,6 +82,11 @@
                         {{ root.record[field].get() }}
                     </fragment>
                 </b-td>
+                <b-td v-if="!__hasShadow()">
+                    <span class="centered">
+                        <b-icon icon="check" @click="handler('select', root.record)" />
+                    </span>
+                </b-td>
             </b-tr>
             <SimpleTree v-for="(child, index) in this.root.children" :key="index"
                 :depth="depth + 1"
@@ -89,7 +108,8 @@
             'fields': Array,
             'handler': Function,
             'isRendered': Boolean,
-            'root': Object
+            'root': Object,
+            'trees': Array
         },
 
         methods: {
