@@ -23,7 +23,7 @@
                     </fragment>
                 </span>
                 <fragment v-else-if="__needsStopID(data.value)">
-                    <b-form-input type="text" :value="data.value.get()" @click="childStopEntry = data.value" size="sm" />
+                    <b-form-input type="text" :value="gtfsStopName(data.value)" @click="childStopEntry = data.value" size="sm" />
                 </fragment>
                 <fragment v-else-if="data.value.isChild()">
                     <b-form-select :value="data.value.get()" size="sm" @change="data.value.set($event)">
@@ -83,7 +83,8 @@
             'items': Function,
             'move': Function,
             'refresh': Function,
-            'gtfsStopTrees': Function
+            'gtfsStopTrees': Function,
+            'gtfsStopName': Function
         },
 
         methods: {

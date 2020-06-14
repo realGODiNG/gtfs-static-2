@@ -160,13 +160,11 @@
                                 </span>
                                 <span :key="divers.stopsKey" v-else-if="element.action.special === 'trips.stop_times'">
                                     <SimpleTable :fields="divers.stopFields" :items="divers.stopItems" :move="divers.stopMove"
-                                        :gtfsStopTrees="gtfsStopTrees"
+                                        :gtfsStopTrees="gtfsStopTrees" :gtfsStopName="gtfsStopName"
                                     />
                                 </span>
                                 <span :key="divers.frequenciesKey" v-else-if="element.action.special === 'trips.frequencies'">
-                                    <SimpleTable :fields="divers.frequencyFields" :items="divers.frequencyItems" :move="null"
-                                        :gtfsStopTrees="gtfsStopTrees"
-                                    />
+                                    <SimpleTable :fields="divers.frequencyFields" :items="divers.frequencyItems" :move="null" />
                                 </span>
                                 <span :key="divers.stationKey" v-else-if="element.action.special === 'stops.station'">
                                     <SimpleTree
@@ -180,16 +178,20 @@
                                 </div>
                                 <span :key="divers.transfersKey" v-else-if="element.action.special === 'stops.transfers'">
                                     <SimpleTable :fields="divers.transferFields" :items="divers.transferItems" :move="null"
-                                        :gtfsStopTrees="gtfsStopTrees"
+                                        :gtfsStopTrees="gtfsStopTrees" :gtfsStopName="gtfsStopName"
                                     />
                                 </span>
                                 <span :key="divers.pathwaysKey" v-else-if="element.action.special === 'stops.pathways'">
                                     <SimpleTable :fields="divers.pathwayFields" :items="divers.pathwayItems" :move="null"
-                                        :gtfsStopTrees="gtfsStopTrees"
+                                        :gtfsStopTrees="gtfsStopTrees" :gtfsStopName="gtfsStopName"
                                     />
                                 </span>
                                 <fragment v-else-if="element.action.special === 'stops.stop_picker'">
-                                    <b-form-input type="text" :value="element.entry.get()" @click="childStopEntry = element.entry" size="sm" />
+                                    <b-form-input type="text"
+                                        :value="gtfsStopName(element.entry)"
+                                        @click="childStopEntry = element.entry"
+                                        size="sm"
+                                    />
                                 </fragment>
                             </fragment>
                             <fragment v-else-if="element.entry.isChild()">
@@ -1844,6 +1846,7 @@
                 }
             },
             createStation() {
+                this.divers = null;
                 const station = this.dataset.get('stops').get('location_type').types[0].enumeration.toHTML('1');
                 this.texterWrapper = {
                     callback: stopID => this.selectStation(this.dataset.get('stops').createRecord([
@@ -1854,6 +1857,7 @@
                 };
             },
             createTrip() {
+                this.divers = null;
                 this.texterWrapper = {
                     callback: tripID => this.selectTrip(this.dataset.get('trips').createRecord([ { property: 'trip_id', value: tripID } ])),
                     title: 'Trip ID'
@@ -1886,20 +1890,41 @@
             gtfsStopTrees(childStopEntry) {
                 const trees = new Array();
                 if (childStopEntry instanceof Entry) {
-                    const childStop = childStopEntry.record;
-                    const onlyStations = childStopEntry.field.file.identifier === 'stops' || childStopEntry.field.file.identifier === 'trips';
+                    const stopID = childStopEntry.field.file.identifier === 'stops' ? childStopEntry.record['stop_id'].get() : null;
+                    const onlyStations = childStopEntry.field.file.identifier === 'stops' || childStopEntry.field.file.identifier === 'stop_times';
                     const station = this.dataset.get('stops').get('location_type').types[0].enumeration.toHTML('1');
                     const stop = this.dataset.get('stops').get('location_type').types[0].enumeration.toHTML('0');
                     this.dataset.get('stops').records.forEach(record => {
-                        if (!childStop.__isEqual(record)) {
-                            const isStation = record['location_type'].get() === station || record['location_type'].get() === stop;
-                            if (record['parent_station'].isEmpty() && (!onlyStations || isStation)) {
-                                trees.push(gtfsStopTree(record, onlyStations));
+                        const isStation = record['location_type'].get() === station || record['location_type'].get() === stop;
+                        if (record['parent_station'].isEmpty() && (!onlyStations || isStation)) {
+                            const tree = gtfsStopTree(record, onlyStations);
+                            if (stopID === null || !tree.contains(stopID)) {
+                                trees.push(tree);
                             }
                         }
                     });
                 }  
                 return trees;
+            },
+            /**
+             * @param {!Entry} stopEntry
+             * @returns {!String}
+             */
+            gtfsStopName(stopEntry) {
+                stopEntry = stopEntry.field.getFullIdentifier() === 'stops.parent_station' ? stopEntry['stop_id'] : stopEntry.data;
+                var name = '';
+                if (stopEntry instanceof Entry && stopEntry.field.getFullIdentifier() === 'stops.stop_id') {
+                    var parentEntry = !stopEntry.record['parent_station'].isEmpty() ? stopEntry.record['parent_station'].data : null;
+                    while (parentEntry !== null && !parentEntry.record['parent_station'].isEmpty()) {
+                        parentEntry = parentEntry.record['parent_station'].data;
+                    }
+                    name += '(' + (parentEntry !== null ? parentEntry.get() : stopEntry.get()) + ')';
+                    name += ' ' + stopEntry.record['stop_name'].get();
+                    if (!stopEntry.record['platform_code'].isEmpty()) {
+                        name += ' - ' + stopEntry.record['platform_code'].get();
+                    }
+                }
+                return name;
             }
         }
     }

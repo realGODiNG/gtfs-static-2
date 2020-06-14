@@ -19,6 +19,9 @@
             </section>
             <footer id="simple-stop-footer" class="centered">
                 <slot name="footer">
+                    <b-button class="m-1" size="sm" type="button" variant="dark" @click="handler('select', null)">
+                        Clear
+                    </b-button>
                     <b-button class="m-1" size="sm" type="button" variant="dark" @click="close()">
                         Cancel
                     </b-button>
@@ -68,7 +71,7 @@
                         this.mainKey += 1;
                         return;
                     case 'select':
-                        this.setter(this.entry, object['stop_id']);
+                        this.setter(this.entry, object !== null ? object['stop_id'] : null);
                         return this.close();
                     default:
                         return;
