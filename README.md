@@ -2,7 +2,12 @@
 
 ## Project setup
 ```
-npm install
+npm install vue bootstrap-vue bootstrap
+npm install --save vue-fragment
+npm install --save v-calendar
+npm install jquery
+npm install jszip
+npm install --save file-saver
 ```
 
 ### Compiles and hot-reloads for development

@@ -163,7 +163,7 @@
       <name>Method</name>
       <reference>stop_times.pickup_type.0</reference>
       <reference>stop_times.drop_off_type.0</reference>
-      <map>0.No Regularly sheduled</map>
+      <map>0.Regularly sheduled</map>
       <map>1.Not available</map>
       <map>2.Must phone Agency</map>
       <map>3.Must coordinate with Driver</map>
