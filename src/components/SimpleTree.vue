@@ -1,6 +1,6 @@
 <template>
     <fragment id="simple-tree">
-        <b-table-simple fixed hover small striped v-if="depth === undefined">
+        <b-table-simple hover small striped v-if="depth === undefined">
             <b-thead>
                 <b-tr>
                     <b-th v-for="field in fields" :key="field">
@@ -23,7 +23,7 @@
                                     </option>
                                 </b-form-select>
                             <span class="centered">
-                                <b-icon icon="plus" @click="handler('add')" />
+                                <b-icon class="m-1" icon="plus" @click="handler('add')" />
                             </span>
                             </fragment>
                             <fragment v-else-if="entry.isChild()">
@@ -75,16 +75,23 @@
                         </fragment>
                     </fragment>
                     <span class="centered" v-if="root.record[field] === undefined">
-                        <b-icon icon="trash" @click="handler('delete', root.record)" v-if="depth != 0" />
-                        <b-icon icon="blank" v-else />
+                        <b-icon class="m-1" icon="check" @click="handler('select', root.record)" />
+                        &nbsp;
+                        <b-icon class="m-1" icon="trash" @click="handler('delete', root.record)" v-if="depth != 0" />
+                        <b-icon class="m-1" icon="blank" v-else />
                     </span>
+                    <fragment v-else-if="root.isSelected">
+                        <b>
+                            {{ root.record[field].get() }}
+                        </b>
+                    </fragment>
                     <fragment v-else>
                         {{ root.record[field].get() }}
                     </fragment>
                 </b-td>
                 <b-td v-if="!__hasShadow()">
                     <span class="centered">
-                        <b-icon icon="check" @click="handler('select', root.record)" />
+                        <b-icon class="m-1" icon="check" @click="handler('select', root.record)" />
                     </span>
                 </b-td>
             </b-tr>

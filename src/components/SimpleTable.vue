@@ -4,26 +4,29 @@
             :fields="fields()"
             :items="items()"
             :key="mainKey"
-            fixed hover small striped
+            hover small striped
         >
             <template v-slot:cell()="data">
                 <span class="centered" v-if="data.value.record === undefined">
                     <fragment v-if="data.item.__isShadow">
-                        <b-icon icon="plus" @click="__addShadow(data.item.__file)" />
+                        <b-icon class="m-1" icon="plus" @click="__addShadow(data.item.__file)" />
                     </fragment>
                     <fragment v-else-if="move !== null">
-                        <b-icon icon="arrow-up" @click="move(data.index, 'up')" />
-                        &nbsp;
-                        <b-icon icon="arrow-down" @click="move(data.index, 'down')" />
-                        &nbsp;
-                        <b-icon icon="trash" @click="__delete(data.item)" />
+                        <b-icon class="m-1" icon="arrow-up" @click="move(data.index, 'up')" />
+                        <b-icon class="m-1" icon="arrow-down" @click="move(data.index, 'down')" />
+                        <b-icon class="m-1" icon="trash" @click="__delete(data.item)" />
                     </fragment>
                     <fragment v-else>
-                        <b-icon icon="trash" @click="__delete(data.item)" />
+                        <b-icon class="m-1" icon="trash" @click="__delete(data.item)" />
                     </fragment>
                 </span>
-                <fragment v-else-if="__needsStopID(data.value)">
-                    <b-form-input type="text" :value="gtfsStopName(data.value)" @click="childStopEntry = data.value" size="sm" />
+                <fragment v-else-if="data.value.hasPicker()">
+                    <b-form-input type="text"
+                        :placeholder="data.value.getDisplayText()"
+                        :value="new String()"
+                        @click="childStopEntry = data.value"
+                        size="sm"
+                    />
                 </fragment>
                 <fragment v-else-if="data.value.isChild()">
                     <b-form-select :value="data.value.get()" size="sm" @change="data.value.set($event)">
@@ -83,8 +86,7 @@
             'items': Function,
             'move': Function,
             'refresh': Function,
-            'gtfsStopTrees': Function,
-            'gtfsStopName': Function
+            'gtfsStopTrees': Function
         },
 
         methods: {
@@ -107,29 +109,6 @@
                     this.refresh();
                 }
                 this.mainKey += 1;
-            },
-            /**
-             * @param {!Entry} entry
-             * @returns {!Boolean}
-             */
-            __needsStopID(entry) {
-                if (entry.record.__isShadow) {
-                    return false;
-                }
-                switch (entry.field.getFullIdentifier()) {
-                    case 'stop_times.stop_id':
-                        // fallsthrough
-                    case 'transfers.from_stop_id':
-                        // fallsthrough
-                    case 'transfers.to_stop_id':
-                        // fallsthrough
-                    case 'pathways.from_stop_id':
-                        // fallsthrough
-                    case 'pathways.to_stop_id':
-                        return true;
-                    default:
-                        return false;
-                }
             },
             /**
              * @param {!Entry} entry

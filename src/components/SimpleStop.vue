@@ -56,8 +56,11 @@
         },
 
         methods: {
-            close() {
-                this.$emit('close');
+            /**
+             * @param {!Boolean|undefined} needsUpdate
+             */
+            close(needsUpdate) {
+                this.$emit('close', needsUpdate !== undefined ? needsUpdate : false);
             },
 
             /**
@@ -72,7 +75,7 @@
                         return;
                     case 'select':
                         this.setter(this.entry, object !== null ? object['stop_id'] : null);
-                        return this.close();
+                        return this.close(this.entry.field.getFullIdentifier() === 'stops.parent_station');
                     default:
                         return;
                 }

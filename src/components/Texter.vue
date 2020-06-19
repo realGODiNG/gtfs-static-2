@@ -5,7 +5,7 @@
                 <slot name="header">
                     <b-navbar toggleable="lg" type="dark" variant="dark">
                         <b-navbar-brand>
-                            {{ wrapper.title }}
+                            '{{ wrapper.title }}'
                         </b-navbar-brand>
                     </b-navbar>
                 </slot>

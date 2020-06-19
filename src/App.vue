@@ -1,6 +1,7 @@
 <template>
     <div id="app">
-        <input id="open-input" type="file" @change="loadDataset($event)" />
+        <input id="open-input-st" type="file" @change="loadDataset($event)" />
+        <input id="open-input-rt" type="file" @change="realtime.load($event)" />
         <b-navbar id="main-menu" toggleable="lg" type="dark" variant="dark">
             <b-navbar-brand>GTFS Static</b-navbar-brand>
             <b-navbar-toggle target="main-menu-collapse"></b-navbar-toggle>
@@ -10,13 +11,24 @@
                         <b-dropdown-item @click="createDataset()">
                             New ...
                         </b-dropdown-item>
-                        <b-dropdown-item id="open-button">
+                        <b-dropdown-item id="open-button-st">
                             Open ...
                         </b-dropdown-item>
                         <b-dropdown-item @click="dataset.save()">
                             Save
                         </b-dropdown-item>
-                    </b-nav-item-dropdown>   
+                    </b-nav-item-dropdown>
+                    <b-nav-item-dropdown text="Realtime">
+                        <b-dropdown-item @click="createRealtime()">
+                            New ...
+                        </b-dropdown-item>
+                        <b-dropdown-item id="open-button-rt">
+                            Open ...
+                        </b-dropdown-item>
+                        <b-dropdown-item @click="realtime.save()">
+                            Save
+                        </b-dropdown-item>
+                    </b-nav-item-dropdown>
                     <b-nav-item-dropdown text="Station">
                         <b-dropdown-item @click="createStation()">
                             New ...
@@ -51,7 +63,7 @@
                 <b-navbar-nav class="ml-auto">
                     <b-nav-item id="dataset-filename" disabled v-if="dataset !== null">
                         <span v-if="table === null">
-                            Dataset: '{{ dataset.filename }}'
+                            Dataset: '{{ dataset.filename }}' - Realtime: '{{ realtime.filename }}'
                         </span>
                         <span v-else>
                             File: '{{ table.file.name }}'
@@ -79,12 +91,12 @@
                 </template>
                 <template v-slot:cell()="data">
                     <span class="centered" v-if="data.value.record === undefined">
-                        <b-icon icon="pen"
+                        <b-icon class="m-1" icon="pen"
                             v-b-tooltip.hover="{ placement: 'top', title: 'Edit record.' }"
                             @click="table.callback(data.item)"
                             v-if="table.callback !== null"
                         />
-                        <b-icon icon="trash"
+                        <b-icon class="m-1" icon="trash"
                             v-b-tooltip.hover="{ placement: 'top', title: 'Delete record.' }"
                             @click="table.deleteRecord(data.item)"
                             v-else
@@ -139,7 +151,7 @@
                             </fragment>
                             <fragment v-if="element.action !== null">
                                 <br v-if="element.label === null" />
-                                <b-icon :icon="element.action.icon"
+                                <b-icon class="m-1" :icon="element.action.icon"
                                     @click="element.action.callback()"
                                     v-if="element.action.icon !== null"
                                 />
@@ -160,7 +172,7 @@
                                 </span>
                                 <span :key="divers.stopsKey" v-else-if="element.action.special === 'trips.stop_times'">
                                     <SimpleTable :fields="divers.stopFields" :items="divers.stopItems" :move="divers.stopMove"
-                                        :gtfsStopTrees="gtfsStopTrees" :gtfsStopName="gtfsStopName"
+                                        :gtfsStopTrees="gtfsStopTrees"
                                     />
                                 </span>
                                 <span :key="divers.frequenciesKey" v-else-if="element.action.special === 'trips.frequencies'">
@@ -174,25 +186,38 @@
                                     />
                                 </span>
                                 <div id="map" :key="divers.mapKey" v-else-if="element.action.special === 'stops.map'">
-                                    <SimpleMap :data="divers.tree.flat()" :refreshParent="divers.stationRefresh" />
+                                    <SimpleMap
+                                        :data="divers.tree.flat()"
+                                        :refreshParent="divers.stationRefresh"
+                                        :select="divers.mapSelect"
+                                    />
                                 </div>
                                 <span :key="divers.transfersKey" v-else-if="element.action.special === 'stops.transfers'">
                                     <SimpleTable :fields="divers.transferFields" :items="divers.transferItems" :move="null"
-                                        :gtfsStopTrees="gtfsStopTrees" :gtfsStopName="gtfsStopName"
+                                        :gtfsStopTrees="gtfsStopTrees"
                                     />
                                 </span>
                                 <span :key="divers.pathwaysKey" v-else-if="element.action.special === 'stops.pathways'">
                                     <SimpleTable :fields="divers.pathwayFields" :items="divers.pathwayItems" :move="null"
-                                        :gtfsStopTrees="gtfsStopTrees" :gtfsStopName="gtfsStopName"
+                                        :gtfsStopTrees="gtfsStopTrees"
                                     />
                                 </span>
-                                <fragment v-else-if="element.action.special === 'stops.stop_picker'">
-                                    <b-form-input type="text"
-                                        :value="gtfsStopName(element.entry)"
-                                        @click="childStopEntry = element.entry"
-                                        size="sm"
-                                    />
-                                </fragment>
+                            </fragment>
+                            <fragment v-else-if="element.entry.hasPicker()">
+                                <b-form-input type="text"
+                                    :placeholder="element.entry.getDisplayText()"
+                                    :value="new String()"
+                                    @click="childStopEntry = element.entry;"
+                                    size="sm"
+                                    v-if="needsStopPicker(element.entry)"
+                                />
+                                <b-form-input type="text"
+                                    :placeholder="element.entry.getDisplayText()"
+                                    :value="new String()"
+                                    @click="childEntry = element.entry;"
+                                    size="sm"
+                                    v-else
+                                />
                             </fragment>
                             <fragment v-else-if="element.entry.isChild()">
                                 <b-form-select :value="element.entry.get()" @change="divers.set(element.entry, $event)" size="sm">
@@ -234,26 +259,43 @@
                 </b-table-simple>
             </b-card>
         </div>
+        <SimplePicker :entry="childEntry"
+            :setter="divers.set"
+            @close="childEntry = null; divers.update($event ? 'full' : ''); divers.key += $event"
+            v-if="divers !== null && childEntry !== null"
+        />
         <SimpleStop :entry="childStopEntry"
             :setter="divers.set"
             :trees="gtfsStopTrees(childStopEntry)"
-            @close="childStopEntry = null"
+            @close="childStopEntry = null; divers.update($event ? 'full' : ''); divers.key += $event"
             v-if="divers !== null && childStopEntry !== null"
         />
+        <SimpleTripUpdate :realtime="realtime" :trip="currentTrip" @close="currentTrip = null" v-if="currentTrip !== null" />
         <Texter :wrapper="texterWrapper" @close="texterWrapper = null" v-if="texterWrapper !== null" />
     </div>
 </template>
 
 <script>
     import SimpleMap from './components/SimpleMap.vue'
+    import SimplePicker from './components/SimplePicker.vue'
     import SimpleStop from './components/SimpleStop.vue'
     import SimpleTable from './components/SimpleTable.vue'
     import SimpleTree from './components/SimpleTree.vue'
+    import SimpleTripUpdate from './components/SimpleTripUpdate.vue'
     import Texter from './components/Texter.vue'
 
     import $ from 'jquery'
     import JSZip from 'jszip'
     import saveAs from 'file-saver'
+
+    /**
+     * @typedef {Object} Tree
+     * @property {!Function} contains
+     * @property {!{ record: !Record, children: !Array.<!Object>, isOpened: !Boolean, isSelected: !Boolean }} data
+     * @property {!String} field
+     * @property {!Function} flat
+     * @property {!Function} select
+     */
 
     /**
      * @returns {!String}
@@ -295,14 +337,17 @@
     /**
      * @param {!Record} record
      * @param {!Boolean} onlyStations
-     * @returns {?{ contains: !Function, data: { record: !Record, children: !Array.<!Object>, isOpened: !Boolean }, field: !String, flat: !Function }}
+     * @param {!Boolean|undefined} __isOpened
+     * @returns {Tree}
      */
-    function gtfsStopTree(record, onlyStations) {
+    function gtfsStopTree(record, onlyStations, __isOpened) {
+        __isOpened = __isOpened !== undefined ? __isOpened : false;
         if (record.__file.identifier !== 'stops') {
             return null;
         }
         const station = record.__file.get('location_type').types[0].enumeration.toHTML('1');
         const stop = record.__file.get('location_type').types[0].enumeration.toHTML('0');
+        const __stopID = record['stop_id'].get();
         const getTreeData = parent => {
             const nodes = parent['stop_id'].children.filter(child => {
                 return onlyStations
@@ -310,7 +355,7 @@
                         && (child.record['location_type'].get() === station || child.record['location_type'].get() === stop)
                     : child.field.file.identifier === 'stops';
             }).map(entry => getTreeData(entry.record));
-            return { record: parent, children: nodes, isOpened: nodes.length != 0 };
+            return { record: parent, children: nodes, isOpened: __isOpened && nodes.length != 0, isSelected: parent['stop_id'].get() === __stopID };
         };
         const __data = getTreeData(record);
         const __contains = (stopID, node) => {
@@ -336,7 +381,14 @@
             node.children.forEach(child => data = __flat(child, data));
             return data;
         };
-        return { contains: __contains, data: __data, field: 'parent_station', flat: __flat };
+        const __select = (stopID, node) => {
+            if (node === undefined) {
+                node = __data;
+            }
+            node.isSelected = stopID.length != 0 && node.record['stop_id'].get() === stopID;
+            node.children.forEach(child => __select(stopID, child));
+        };
+        return { contains: __contains, data: __data, field: 'parent_station', flat: __flat, select: __select };
     }
 
     /**
@@ -441,6 +493,118 @@
             }, function(reason) {
                 console.log(reason);
             });
+        }
+    }
+
+    class Realtime {
+        /**
+         * @param {!Dataset} dataset
+         */
+        constructor(dataset) {
+            var gtfsRealtimeBindings = require('gtfs-realtime-bindings');
+
+            /** @type {!String} */
+            this.filename = 'untitled';
+
+            /** @type {!Object} */
+            this.feed = gtfsRealtimeBindings.transit_realtime.FeedMessage.create();
+            this.feed['header'] = { gtfsRealtimeVersion: "2.0", incrementality: 0, timestamp: Math.floor(new Date().getTime() / 1000) };
+
+            /** @type {!File} */
+            this.frequencies = dataset.get('frequencies');
+        }
+
+        /**
+         * @param {!Record} record
+         * @returns {!Boolean}
+         */
+        isFrequencyBasedTrip(record) {
+            if (record.__file.identifier !== 'trips') {
+                return false;
+            }
+            const trip_id = record['trip_id'].get();
+            return this.frequencies.records.find(record => record['trip_id'].get() === trip_id) !== undefined;
+        }
+        /**
+         * @param {!Record} record
+         * @returns {!Boolean}
+         */
+        isScheduleBasedTrip(record) {
+            if (record.__file.identifier !== 'trips' || this.isFrequencyBasedTrip(record)) {
+                return false;
+            }
+            return record['service_id'].fieldType.parent.file.identifier === 'calendar'; 
+        }
+
+        /**
+         * @param {!Record} record
+         * @param {!String} date
+         * @param {!String} time
+         * @param {!Number} schedule
+         * @param {!Array.<!Object>} stopTimeUpdates
+         */
+        addTripUpdate(record, date, time, schedule, stopTimeUpdates) {
+            this.feed.entity.push(new Object());
+            var entity = this.feed.entity[this.feed.entity.length - 1];
+
+            entity['id'] = (this.feed.entity.length - 1).toString();
+
+            entity['tripUpdate'] = new Object();
+            var tripUpdate = entity['tripUpdate'];
+
+            tripUpdate['trip'] = new Object();
+            var trip = tripUpdate['trip'];
+            trip['tripId'] = record['trip_id'].get();
+            /*
+             * if (this.isScheduleBasedTrip(record)) {
+             *     trip['route_id'] = record['route_id'].get();
+             *     trip['direction_id'] = Number.parseInt(record['direction_id'].fieldType.enumeration.fromHTML(record['direction_id'].get()));
+             * }
+             */
+            if (time.length != 0) {
+                trip['startTime'] = time;
+            }
+            if (date.length != 0) {
+                trip['startDate'] = date.split('-').join('');
+            }
+            if (schedule.length != 0) {
+                trip['scheduleRelationship'] = schedule;
+            }
+
+            if (stopTimeUpdates.length != 0) {
+                tripUpdate['stopTimeUpdate'] = stopTimeUpdates;
+            }
+            tripUpdate['timestamp'] = Math.floor(new Date().getTime() / 1000);
+        }
+
+        /**
+         * @param {!Object} event
+         */
+        load(event) {
+            const pbFile = event.target.files[0];
+            var reader = new FileReader();
+            reader.onload = event => {
+                var gtfsRealtimeBindings = require('gtfs-realtime-bindings');
+                this.filename = pbFile.name.slice(0, -3);
+                this.feed = gtfsRealtimeBindings.transit_realtime.FeedMessage.decode(Buffer.from(event.target.result));
+                console.log('binary realtime feed loaded: ', this.feed);
+            };
+            reader.readAsArrayBuffer(pbFile);
+        }
+        /**
+         * @param {!String|undefined} filename
+         */
+        reset(filename) {
+            var gtfsRealtimeBindings = require('gtfs-realtime-bindings');
+            this.filename = typeof filename === 'string' && filename.length != 0 ? filename : 'untitled';
+            this.feed = gtfsRealtimeBindings.transit_realtime.FeedMessage.create();
+            this.feed['header'] = { gtfsRealtimeVersion: "2.0", incrementality: 0, timestamp: Math.floor(new Date().getTime() / 1000) };
+        }
+        save() {
+            var gtfsRealtimeBindings = require('gtfs-realtime-bindings');
+            var raw = gtfsRealtimeBindings.transit_realtime.FeedMessage.encode(this.feed).finish();
+            var blob = new Blob([ raw ], { type: 'application/octet-stream' });
+            saveAs(blob, this.filename + '.pb');
         }
     }
 
@@ -784,6 +948,8 @@
          * @param {!String} parent
          */
         constructor(field, structure, enumeration, parent) {
+            const fullIdentifier = field.getFullIdentifier();
+
             /** @type {!Field} */
             this.field = field;
 
@@ -798,6 +964,16 @@
 
             /** @type {?Field} - Can be a string until dataset is constructed. */
             this.parent = parent.length != 0 ? parent : null;
+
+            /** @type {!Boolean} */
+            this.hasPicker = fullIdentifier === 'stops.parent_station'
+                || fullIdentifier === 'stop_times.stop_id'
+                || fullIdentifier === 'transfers.from_stop_id'
+                || fullIdentifier === 'transfers.to_stop_id'
+                || fullIdentifier === 'pathways.from_stop_id'
+                || fullIdentifier === 'pathways.to_stop_id'
+                || fullIdentifier === 'trips.route_id'
+                || fullIdentifier === 'stops.level_id';
         }
 
         /**
@@ -962,6 +1138,13 @@
         }
 
         /**
+         * @returns {!Boolean}
+         */
+        hasPicker() {
+            return this.fieldType.hasPicker;
+        }
+
+        /**
          * @param {?Entry} other
          * @returns {!Boolean}
          */
@@ -1003,12 +1186,34 @@
          * @returns {!String}
          */
         getDisplayText() {
-            const displayText = !this.record.__isShadow && this.isChild() ? this.data !== null ? this.data.get() : '' : this.data;
+            const displayText = this.get();
+            if (displayText.length == 0) {
+                return '';
+            }
+            var parentRecord;
             switch (this.field.getFullIdentifier()) {
-                case 'agency.agency_id':
-                    return '(' + displayText + ') ' + this.record['agency_name'].get();
-                case 'routes.route_id':
-                    return '(' + displayText + ') ' + this.record['route_long_name'].get();
+                case 'trips.agency_id':
+                    return '(' + displayText + ') ' + this.data.record['agency_name'].get();
+                case 'trips.route_id':
+                    return '(' + displayText + ') ' + this.data.record['route_long_name'].get();
+                case 'stops.parent_station':
+                    // fallsthrough
+                case 'stop_times.stop_id':
+                    // fallsthrough
+                case 'transfers.from_stop_id':
+                    // fallsthrough
+                case 'transfers.to_stop_id':
+                    // fallsthrough
+                case 'pathways.from_stop_id':
+                    // fallsthrough
+                case 'pathways.to_stop_id':
+                    parentRecord = this.record.__isShadow
+                        ? this.fieldType.parent.file.records.find(record => record['stop_id'].get() === this.data)
+                        : this.data.record;
+                    return '(' + displayText + ') ' + parentRecord['stop_name'].get()
+                        + (!parentRecord['platform_code'].isEmpty() ? ' - ' + parentRecord['platform_code'].get() : '');
+                case 'stops.level_id':
+                    return this.data.record['level_index'].get() + ' - ' + this.data.record['level_name'].get();
                 default:
                     return displayText;
             }
@@ -1034,6 +1239,9 @@
             if (!this.record.__isShadow && this.isChild() && typeof data === 'string') {
                 const record = this.fieldType.parent.file.records.find(record => record[this.fieldType.parent.identifier].get() === data);
                 data = record instanceof Record ? record[this.fieldType.parent.identifier] : null;
+            }
+            else if (this.record.__isShadow && typeof data !== 'string') {
+                data = data instanceof Entry ? data.get() : '';
             }
             if (!this.record.__isShadow && this.isChild()) {
                 if (data === null || data.isEmpty()) {
@@ -1198,11 +1406,13 @@
 
             /** @type {!Dataset} */
             this.dataset = station.__file.dataset;
+            this.dataset.get('transfers').shadowRecord.__delete();
+            this.dataset.get('pathways').shadowRecord.__delete();
 
             /** @type {!Record} */
             this.record = station;
 
-            /** @type {!Object} */
+            /** @type {!Tree} */
             this.tree = new Object();
 
             /** @type {!Array.<!{ title: !String, table: !Array.<!Object> }>} */
@@ -1231,11 +1441,22 @@
                         this.stationKey += 1;
                         return;
                     case 'delete':
+                        if (this.currentStop.__isEqual(object)) {
+                            this.currentStop = this.record;
+                            this.tree.select(object['stop_id'].get());
+                            this.update('stop');
+                        }
                         object.__delete();
                         this.update('tree');
                         this.stationKey += 1;
                         return;
                     case 'refresh':
+                        this.stationKey += 1;
+                        return;
+                    case 'select':
+                        this.currentStop = object;
+                        this.tree.select(object['stop_id'].get());
+                        this.update('stop');
                         this.stationKey += 1;
                         return;
                     case 'shadow':
@@ -1244,7 +1465,6 @@
                         return;
                 }
             };
-            this.dataset.get('stops').shadowRecord.__delete();
 
             /** @type {!Number} */
             this.stationKey = 1000;
@@ -1257,6 +1477,16 @@
             /** @type {!Number} */
             this.mapKey = 2000;
 
+            this.mapSelect = (stop) => {
+                this.currentStop = stop;
+                this.tree.select(stop['stop_id'].get());
+                this.update('stop');
+                this.stationKey += 1;
+            }
+
+            /** @type {!Record} */
+            this.currentStop = this.record;
+
             /** @type {!Function} */
             this.transferFields = () => [ 'from_stop_id', 'to_stop_id', 'transfer_type', 'min_transfer_time', '__action' ];
 
@@ -1265,8 +1495,7 @@
                 const __filter = record => this.tree.contains(record['from_stop_id'].get()) || this.tree.contains(record['to_stop_id'].get());
                 const items = this.dataset.get('transfers').records.filter(__filter);
                 const shadow = this.dataset.get('transfers').shadowRecord;
-                shadow.__delete();
-                shadow['from_stop_id'].set(this.record['stop_id'].get());
+                // shadow['from_stop_id'].set(this.record['stop_id'].get());
                 return items.concat([ shadow ]);
             };
 
@@ -1281,8 +1510,7 @@
                 const __filter = record => this.tree.contains(record['from_stop_id'].get()) || this.tree.contains(record['to_stop_id'].get());
                 const items = this.dataset.get('pathways').records.filter(__filter);
                 const shadow = this.dataset.get('pathways').shadowRecord;
-                shadow.__delete();
-                shadow['from_stop_id'].set(this.record['stop_id'].get());
+                // shadow['from_stop_id'].set(this.record['stop_id'].get());
                 return items.concat([ shadow ]);
             };
 
@@ -1298,46 +1526,6 @@
                 data: [
                     { action: { icon: null, text: null, special: 'stops.station' }, colspan: 2, rowspan: 1 },
                     { action: { icon: null, text: null, special: 'stops.map' }, colspan: 1, rowspan: 1 }
-                ]
-            });
-
-            this.mockups.find(mockup => mockup.title === 'Stop').table.push({
-                key: 'stop-row-1',
-                data: [
-                    { action: null, colspan: 1, entry: this.record['stop_id'], label: 'Stop ID', rowspan: 1 },
-                    { action: null, colspan: 2, entry: this.record['stop_name'], label: 'Stop Name', rowspan: 1 },
-                    { action: null, colspan: 1, entry: this.record['stop_lat'], label: 'Latitude', rowspan: 1 },
-                    { action: null, colspan: 1, entry: this.record['stop_lon'], label: 'Longitude', rowspan: 1 }
-                ]
-            });
-            this.mockups.find(mockup => mockup.title === 'Stop').table.push({
-                key: 'stop-row-2',
-                data: [
-                    { action: null, colspan: 1, entry: this.record['location_type'], label: 'Type', rowspan: 1 },
-                    {
-                        action: { icon: null, text: null, special: 'stops.stop_picker' },
-                        colspan: 2,
-                        entry: this.record['parent_station'],
-                        label: 'Parent Station',
-                        rowspan: 1
-                    },
-                    { action: null, colspan: 2, entry: this.record['stop_desc'], label: 'Description', rowspan: 2 }
-                ]
-            });
-            this.mockups.find(mockup => mockup.title === 'Stop').table.push({
-                key: 'stop-row-3',
-                data: [
-                    { action: null, colspan: 1, entry: this.record['stop_code'], label: 'Stop Code', rowspan: 1 },
-                    { action: null, colspan: 2, entry: this.record['level_id'], label: 'Level ID', rowspan: 1 }
-                ]
-            });
-            this.mockups.find(mockup => mockup.title === 'Stop').table.push({
-                key: 'stop-row-4',
-                data: [
-                    { action: null, colspan: 1, entry: this.record['platform_code'], label: 'Platform Code', rowspan: 1 },
-                    { action: null, colspan: 1, entry: this.record['stop_timezone'], label: 'Timezone', rowspan: 1 },
-                    { action: null, colspan: 1, entry: this.record['wheelchair_boarding'], label: 'Wheelchair Boarding', rowspan: 1 },
-                    { action: null, colspan: 2, entry: this.record['stop_url'], label: 'URL', rowspan: 1 }
                 ]
             });
 
@@ -1362,6 +1550,11 @@
          * @param {!String} updateKey
          */
         update(updateKey) {
+            if (updateKey.length == 0) {
+                return;
+            }
+
+            const stopTable = this.mockups.find(mockup => mockup.title === 'Stop').table;
             const shadowRecord = this.dataset.get('stops').shadowRecord;
 
             switch (updateKey) {
@@ -1369,8 +1562,50 @@
                     shadowRecord['stop_name'].set(this.record['stop_name'].get());
                     shadowRecord['parent_station'].set(this.record['stop_id'].get());
                     // fallsthrough
+                case 'stop':
+                    stopTable.length = 0;
+                    stopTable.push({
+                        key: 'stop-row-1',
+                        data: [
+                            { action: null, colspan: 1, entry: this.currentStop['stop_id'], label: 'Stop ID', rowspan: 1 },
+                            { action: null, colspan: 2, entry: this.currentStop['stop_name'], label: 'Stop Name', rowspan: 1 },
+                            { action: null, colspan: 1, entry: this.currentStop['stop_lat'], label: 'Latitude', rowspan: 1 },
+                            { action: null, colspan: 1, entry: this.currentStop['stop_lon'], label: 'Longitude', rowspan: 1 }
+                        ]
+                    });
+                    stopTable.push({
+                        key: 'stop-row-2',
+                        data: [
+                            { action: null, colspan: 1, entry: this.currentStop['location_type'], label: 'Type', rowspan: 1 },
+                            { action: null, colspan: 2, entry: this.currentStop['parent_station'], label: 'Parent Station', rowspan: 1 },
+                            { action: null, colspan: 2, entry: this.currentStop['stop_desc'], label: 'Description', rowspan: 2 }
+                        ]
+                    });
+                    stopTable.push({
+                        key: 'stop-row-3',
+                        data: [
+                            { action: null, colspan: 1, entry: this.currentStop['stop_code'], label: 'Stop Code', rowspan: 1 },
+                            { action: null, colspan: 2, entry: this.currentStop['level_id'], label: 'Level ID', rowspan: 1 }
+                        ]
+                    });
+                    stopTable.push({
+                        key: 'stop-row-4',
+                        data: [
+                            { action: null, colspan: 1, entry: this.currentStop['platform_code'], label: 'Platform Code', rowspan: 1 },
+                            { action: null, colspan: 1, entry: this.currentStop['stop_timezone'], label: 'Timezone', rowspan: 1 },
+                            { action: null, colspan: 1, entry: this.currentStop['wheelchair_boarding'], label: 'Wheelchair Boarding', rowspan: 1 },
+                            { action: null, colspan: 2, entry: this.currentStop['stop_url'], label: 'URL', rowspan: 1 }
+                        ]
+                    });
+                    if (updateKey !== 'full') {
+                        break;
+                    }
+                    // fallsthrough
                 case 'tree':
-                    this.tree = gtfsStopTree(this.record, false);
+                    this.tree = null;
+                    this.stationKey += 1;
+                    this.tree = gtfsStopTree(this.record, false, true);
+                    this.tree.select(this.currentStop['stop_id'].get());
                     if (updateKey !== 'full') {
                         break;
                     }
@@ -1393,8 +1628,17 @@
                     case 'stops.stop_id':
                         // fallsthrough
                     case 'stops.stop_name':
+                        // fallsthrough
+                    case 'stops.location_type':
+                        // fallsthrough
+                    case 'stops.platform_code':
                         this.update('full');
                         this.key += 1;
+                        break;
+                    case 'stops.stop_lat':
+                        // fallsthrough
+                    case 'stops.stop_lon':
+                        this.mapKey += 1;
                         break;
                     default:
                         break;
@@ -1414,6 +1658,8 @@
 
             /** @type {!Dataset} */
             this.dataset = trip.__file.dataset;
+            this.dataset.get('stops').shadowRecord.__delete();
+            this.dataset.get('frequencies').shadowRecord.__delete();
 
             /** @type {!Record} */
             this.record = trip;
@@ -1453,7 +1699,6 @@
                     const value = parseInt(record['stop_sequence'].get(), 10);
                     return record['trip_id'].get() === tripID && maximum < value ? value : maximum;
                 }, 0);
-                shadow.__delete();
                 shadow['trip_id'].set(tripID);
                 shadow['stop_sequence'].set((stop_sequence + 1).toString());
                 return items.sort(__sort).concat([ shadow ]);
@@ -1481,7 +1726,6 @@
             this.frequencyItems = () => {
                 const items = this.record['trip_id'].children.filter(child => child.field.file.identifier === 'frequencies').map(entry => entry.record);
                 const shadow = this.dataset.get('frequencies').shadowRecord;
-                shadow.__delete();
                 shadow['trip_id'].set(this.record['trip_id'].get());
                 return items.concat([ shadow ]);
             };
@@ -1493,6 +1737,11 @@
         }
 
         afterConstructed() {
+            const addTripUpdate = {
+                callback: () => this.vue.currentTrip = this.record,
+                icon: null,
+                text: 'Add Trip Update'
+            };
             this.mockups.find(mockup => mockup.title === 'Trip').table.push({
                 key: 'trip-row-1',
                 data: [
@@ -1508,6 +1757,12 @@
                     { action: null, colspan: 1, entry: this.record['direction_id'], label: 'Direction', rowspan: 1 },
                     { action: null, colspan: 1, entry: this.record['wheelchair_accessible'], label: 'Wheelchair Accessible', rowspan: 1 },
                     { action: null, colspan: 1, entry: this.record['bikes_allowed'], label: 'Bikes Allowed', rowspan: 1 }
+                ]
+            });
+            this.mockups.find(mockup => mockup.title === 'Trip').table.push({
+                key: 'trip-row-3',
+                data: [
+                    { action: addTripUpdate, colspan: 4, entry: null, label: null, rowspan: 1 }
                 ]
             });
 
@@ -1570,6 +1825,10 @@
          * @param {!String} updateKey
          */
         update(updateKey) {
+            if (updateKey.length == 0) {
+                return;
+            }
+
             const routeTable = this.mockups.find(mockup => mockup.title === 'Route').table;
             const route = !this.record['route_id'].isEmpty() ? this.record['route_id'].data.record : null;
 
@@ -1709,8 +1968,6 @@
             }
             if (entry.set(data) && !entry.record.__isShadow) {
                 switch (entry.field.getFullIdentifier()) {
-                    case 'trips.route_id':
-                        // fallsthrough
                     case 'trips.service_id':
                         this.update('full');
                         this.key += 1;
@@ -1746,22 +2003,33 @@
         name: 'App',
         components: {
             SimpleMap,
+            SimplePicker,
             SimpleStop,
             SimpleTable,
             SimpleTree,
+            SimpleTripUpdate,
             Texter
         },
 
         data() {
             return {
                 /** @type {?Entry} */
+                childEntry: null,
+
+                /** @type {?Entry} */
                 childStopEntry: null,
+
+                /** @type {?Record} */
+                currentTrip: null,
 
                 /** @type {?{ callback: !Function, title: !String }} */
                 texterWrapper: null,
 
                 /** @type {!Dataset} */
                 dataset: null,
+
+                /** @type {!Realtime} */
+                realtime: null,
 
                 /** @type {?Table} */
                 table: null,
@@ -1780,15 +2048,18 @@
             };
         },
         mounted() {
-            $("#open-button").click(() => $("#open-input").click());
+            $("#open-button-st").click(() => $("#open-input-st").click());
+            $("#open-button-rt").click(() => $("#open-input-rt").click());
 
             if (process.env.NODE_ENV === 'production') {
                 this.dataset = new Dataset(new DOMParser().parseFromString(getXML(), 'text/xml'));
+                this.realtime = new Realtime(this.dataset);
             } else {
                 var httpRequest = new XMLHttpRequest();
                 httpRequest.onreadystatechange = () => {
                     if (httpRequest.readyState == 4 && httpRequest.status == 200) {
                         this.dataset = new Dataset(new DOMParser().parseFromString(httpRequest.responseText, 'application/xml'));
+                        this.realtime = new Realtime(this.dataset);
                     }
                 };
                 httpRequest.open('GET', 'http://localhost:8080/gtfs-static.xml', true);
@@ -1810,7 +2081,11 @@
                 this.divers = null;
                 this.station = null;
                 this.trip = null;
+                this.realtime.reset();
                 this.texterWrapper = { title: 'Filename', callback: filename => this.dataset.reset(filename) };
+            },
+            createRealtime() {
+                this.texterWrapper = { title: 'Filename', callback: filename => this.realtime.reset(filename) };
             },
             /**
              * @param {!Object} event
@@ -1820,6 +2095,7 @@
                 this.divers = null;
                 this.station = null;
                 this.trip = null;
+                this.realtime.reset();
                 this.dataset.load(event);
             },
 
@@ -1896,7 +2172,28 @@
                 this.trip = trip.__file.identifier === 'trips' ? new Trip(trip, this) : null;
                 this.divers = this.trip;
             },
-
+            /**
+             * @param {!Entry} entry
+             * @returns {!Boolean}
+             */
+            needsStopPicker(entry) {
+                switch (entry.field.getFullIdentifier()) {
+                    case 'stops.parent_station':
+                        // fallsthrough
+                    case 'stop_times.stop_id':
+                        // fallsthrough
+                    case 'transfers.from_stop_id':
+                        // fallsthrough
+                    case 'transfers.to_stop_id':
+                        // fallsthrough
+                    case 'pathways.from_stop_id':
+                        // fallsthrough
+                    case 'pathways.to_stop_id':
+                        return true;
+                    default:
+                        return false;
+                }
+            },
             /**
              * @param {!Entry} childStopEntry
              * @returns {!Array.<!Object>}
@@ -1904,7 +2201,7 @@
             gtfsStopTrees(childStopEntry) {
                 const trees = new Array();
                 if (childStopEntry instanceof Entry) {
-                    const stopID = childStopEntry.field.file.identifier === 'stops' ? childStopEntry.record['stop_id'].get() : null;
+                    const stopID = childStopEntry.get();
                     const onlyStations = childStopEntry.field.file.identifier === 'stops' || childStopEntry.field.file.identifier === 'stop_times';
                     const station = this.dataset.get('stops').get('location_type').types[0].enumeration.toHTML('1');
                     const stop = this.dataset.get('stops').get('location_type').types[0].enumeration.toHTML('0');
@@ -1912,40 +2209,19 @@
                         const isStation = record['location_type'].get() === station || record['location_type'].get() === stop;
                         if (record['parent_station'].isEmpty() && (!onlyStations || isStation)) {
                             const tree = gtfsStopTree(record, onlyStations);
-                            if (stopID === null || !tree.contains(stopID)) {
-                                trees.push(tree);
-                            }
+                            tree.select(stopID);
+                            trees.push(tree);
                         }
                     });
                 }  
                 return trees;
-            },
-            /**
-             * @param {!Entry} stopEntry
-             * @returns {!String}
-             */
-            gtfsStopName(stopEntry) {
-                stopEntry = stopEntry.field.getFullIdentifier() === 'stops.parent_station' ? stopEntry['stop_id'] : stopEntry.data;
-                var name = '';
-                if (stopEntry instanceof Entry && stopEntry.field.getFullIdentifier() === 'stops.stop_id') {
-                    var parentEntry = !stopEntry.record['parent_station'].isEmpty() ? stopEntry.record['parent_station'].data : null;
-                    while (parentEntry !== null && !parentEntry.record['parent_station'].isEmpty()) {
-                        parentEntry = parentEntry.record['parent_station'].data;
-                    }
-                    name += '(' + (parentEntry !== null ? parentEntry.get() : stopEntry.get()) + ')';
-                    name += ' ' + stopEntry.record['stop_name'].get();
-                    if (!stopEntry.record['platform_code'].isEmpty()) {
-                        name += ' - ' + stopEntry.record['platform_code'].get();
-                    }
-                }
-                return name;
             }
         }
     }
 </script>
 
 <style>
-    #open-input {
+    #open-input-rt, #open-input-st {
         display: none;
     }
 
