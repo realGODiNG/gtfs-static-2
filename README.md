@@ -10,6 +10,7 @@ npm install --save v-calendar
 npm install --save jszip
 npm install --save file-saver
 npm install --save mapbox-gl
+npm install
 ```
 
 ### Compiles and hot-reloads for development
