@@ -91,7 +91,8 @@
                 </b-td>
                 <b-td v-if="!__hasShadow()">
                     <span class="centered">
-                        <b-icon class="m-1" icon="check" @click="handler('select', root.record)" />
+                        <b-icon class="m-1" icon="check" @click="handler('select', root.record)" v-if="handler('legal', root.record)" />
+                        <b-icon class="m-1" icon="blank" v-else />
                     </span>
                 </b-td>
             </b-tr>

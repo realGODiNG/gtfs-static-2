@@ -1,7 +1,7 @@
 <template>
     <fragment>
         <div id="simple-map" :key="mainKey" />
-        <div v-for="(record, index) in data" :key="'marker-' + index" :id="'marker-' + index" class="h3 mb-2">
+        <div v-for="(record, index) in data" :key="'marker-' + index" :id="'marker-' + index" :class="(isSelected(record) ? 'h2' : 'h4') + ' mb-2'">
             <b-icon icon="geo-alt" :variant="getVariant(index)"
                 v-b-tooltip.hover="{ placement: 'top', title: getDisplayText(index) }"
                 @click="select(record)"
@@ -75,6 +75,7 @@
         },
         props: {
             'data': Array,
+            'isSelected': Function,
             'refreshParent': Function,
             'select': Function
         },
@@ -85,7 +86,9 @@
              * @returns {!Boolean}
              */
             isShown(index) {
-                return this.data[index] !== undefined && this.getProperty(index, 'location_type', true) !== '4';
+                const stop = this.data[index];
+                return stop !== undefined && !stop['stop_lat'].isEmpty() && !stop['stop_lon'].isEmpty()
+                    && this.getProperty(index, 'location_type', true) !== '4';
             },
 
             /**

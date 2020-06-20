@@ -190,6 +190,7 @@
                                 <div id="map" :key="divers.mapKey" v-else-if="element.action.special === 'stops.map'">
                                     <SimpleMap
                                         :data="divers.tree.flat()"
+                                        :isSelected="divers.mapIsSelect"
                                         :refreshParent="divers.stationRefresh"
                                         :select="divers.mapSelect"
                                     />
@@ -1494,12 +1495,16 @@
             /** @type {!Number} */
             this.mapKey = 2000;
 
-            this.mapSelect = (stop) => {
+            /** @type {!Function} */
+            this.mapIsSelect = stop => this.currentStop.__isEqual(stop);
+
+            /** @type {!Function} */
+            this.mapSelect = stop => {
                 this.currentStop = stop;
                 this.tree.select(stop['stop_id'].get());
                 this.update('stop');
                 this.stationKey += 1;
-            }
+            };
 
             /** @type {!Record} */
             this.currentStop = this.record;

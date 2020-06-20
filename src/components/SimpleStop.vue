@@ -98,6 +98,8 @@
              */
             handler(type, object) {
                 switch (type) {
+                    case 'legal':
+                        return !this.illegalStopIDs.includes(object['stop_id'].get());
                     case 'refresh':
                         this.mainKey += 1;
                         return;
@@ -126,6 +128,28 @@
                     }
                     return false;
                 });
+            },
+            /**
+             * @returns {!Array.<!String>}
+             */
+            illegalStopIDs() {
+                if (this.entry.field.getFullIdentifier() !== 'stops.parent_station') {
+                    return new Array();
+                }
+                const getStops = (stop, data) => {
+                    if (stop === undefined) {
+                        stop = this.entry.record;
+                        data = new Array();
+                    }
+                    data.push(stop);
+                    stop['stop_id'].children.forEach(child => {
+                        if (child.field.file.identifier === 'stops') {
+                            data = getStops(child.record, data);
+                        }  
+                    });
+                    return data;
+                };
+                return getStops().map(stop => stop['stop_id'].get());
             }
         }
     };
