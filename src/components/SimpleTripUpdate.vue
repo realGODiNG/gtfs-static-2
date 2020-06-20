@@ -33,7 +33,7 @@
                                         <b-form-input type="date" v-model="startDate" size="sm" />
                                     </b-td>
                                     <b-td v-if="isFrequencyBased">
-                                        <b-form-input type="text" v-model="startTime" size="sm" :pattern="'[0-3]?\\d:[0-5]\\d:[0-5]\\d|4[0-7]:[0-5]\\d:[0-5]\\d'" />
+                                        <b-form-select v-model="startTime" :options="stopTimes" size="sm" />
                                     </b-td>
                                     <b-td>
                                         <b-form-select v-model="schedule" :options="scheduleRelationship" size="sm" />
@@ -226,6 +226,65 @@
                         ? { property: 'stop_id', value: stopID.get() }
                         : { property: 'stop_sequence', value: stopSequence.get() };
                 });
+            },
+            /**
+            * @returns {!Array.<!String>}
+            */
+            stopTimes() {
+                if (this.trip.__file.identifier !== 'trips') {
+                    return new Array();
+                }
+                var times = new Array();
+                const isNotGreater = (a, b) => {
+                    var [ a0, a1, a2 ] = a.split(':');
+                    var [ b0, b1, b2 ] = b.split(':');
+                    return (Number.parseInt(a0, 10) - Number.parseInt(b0, 10)) * 3600
+                        + (Number.parseInt(a1, 10) - Number.parseInt(b1, 10)) * 60
+                        <= Number.parseInt(b2, 10) - Number.parseInt(a2, 10);
+                };
+                const addSeconds = (time, secs) => {
+                    var hours = Math.floor(secs / 3600);
+                    var minutes = Math.floor((secs - hours * 3600) / 60);
+                    var seconds = secs - minutes * 60 - hours * 3600;
+                    var [ t0, t1, t2 ] = time.split(':');
+                    seconds += Number.parseInt(t2, 10);
+                    if (seconds >= 60) {
+                        minutes++;
+                        seconds -= 60;
+                    }
+                    minutes += Number.parseInt(t1, 10);
+                    if (minutes >= 60) {
+                        hours++;
+                        minutes -= 60;
+                    }
+                    hours += Number.parseInt(t0, 10);
+                    return '' + hours + ':' + (minutes <= 9 ? '0' + minutes : minutes) + ':' + (seconds <= 9 ? '0' + seconds : seconds);
+                };
+                var iteratorTime = '99:99:99';
+                this.trip['trip_id'].children.forEach(child => {
+                    if (child.field.file.identifier === 'stop_times' && !child.record['departure_time'].isEmpty()) {
+                        const time = child.record['departure_time'].get();
+                        if (isNotGreater(time, iteratorTime)) {
+                            iteratorTime = time;
+                        }
+                    }
+                });
+                if (iteratorTime !== '99:99:99') {
+                    times.push(iteratorTime);
+                    this.trip['trip_id'].children.forEach(child => {
+                        if (child.field.file.identifier === 'frequencies' && !child.record['end_time'].isEmpty() && !child.record['headway_secs'].isEmpty()) {
+                            const endTime = child.record['end_time'].get();
+                            const headwaySeconds = Number.parseInt(child.record['headway_secs'].get(), 10);
+                            var time = addSeconds(iteratorTime, headwaySeconds);
+                            while (isNotGreater(time, endTime)) {
+                                times.push(time);
+                                time = addSeconds(time, headwaySeconds);
+                            }
+                            iteratorTime = time;
+                        }
+                    });
+                }
+                return times.sort((a, b) => isNotGreater(a, b) ? (a !== b ? -1 : 0) : 1);
             },
 
             /**
