@@ -82,12 +82,12 @@
                 fixed hover small striped
             >
                 <template v-slot:head()="data">
-                    <fragment v-b-tooltip.hover="{ placement: 'bottom', title: data.label }" v-if="data.label.length != 0">
+                    <span v-b-tooltip.hover="{ placement: 'bottom', title: data.label }" v-if="data.label.length != 0">
                         {{ table.formator(data.column) }}
-                    </fragment>
-                    <fragment v-else>
+                    </span>
+                    <span v-else>
                         {{ table.formator(data.column) }}
-                    </fragment>
+                    </span>
                 </template>
                 <template v-slot:cell()="data">
                     <span class="centered" v-if="data.value.record === undefined">
@@ -172,11 +172,13 @@
                                 </span>
                                 <span :key="divers.stopsKey" v-else-if="element.action.special === 'trips.stop_times'">
                                     <SimpleTable :fields="divers.stopFields" :items="divers.stopItems" :move="divers.stopMove"
-                                        :gtfsStopTrees="gtfsStopTrees"
+                                        :needsStopPicker="needsStopPicker" :gtfsStopTrees="x => gtfsStopTrees(x, divers.record)"
                                     />
                                 </span>
                                 <span :key="divers.frequenciesKey" v-else-if="element.action.special === 'trips.frequencies'">
-                                    <SimpleTable :fields="divers.frequencyFields" :items="divers.frequencyItems" :move="null" />
+                                    <SimpleTable :fields="divers.frequencyFields" :items="divers.frequencyItems" :move="null"
+                                        :needsStopPicker="needsStopPicker"
+                                    />
                                 </span>
                                 <span :key="divers.stationKey" v-else-if="element.action.special === 'stops.station'">
                                     <SimpleTree
@@ -194,12 +196,12 @@
                                 </div>
                                 <span :key="divers.transfersKey" v-else-if="element.action.special === 'stops.transfers'">
                                     <SimpleTable :fields="divers.transferFields" :items="divers.transferItems" :move="null"
-                                        :gtfsStopTrees="gtfsStopTrees"
+                                        :needsStopPicker="needsStopPicker" :gtfsStopTrees="x => gtfsStopTrees(x, divers.record)"
                                     />
                                 </span>
                                 <span :key="divers.pathwaysKey" v-else-if="element.action.special === 'stops.pathways'">
                                     <SimpleTable :fields="divers.pathwayFields" :items="divers.pathwayItems" :move="null"
-                                        :gtfsStopTrees="gtfsStopTrees"
+                                        :needsStopPicker="needsStopPicker" :gtfsStopTrees="x => gtfsStopTrees(x, divers.record)"
                                     />
                                 </span>
                             </fragment>
@@ -266,7 +268,7 @@
         />
         <SimpleStop :entry="childStopEntry"
             :setter="divers.set"
-            :trees="gtfsStopTrees(childStopEntry)"
+            :trees="gtfsStopTrees(childStopEntry, divers.record)"
             @close="childStopEntry = null; divers.update($event ? 'full' : ''); divers.key += $event"
             v-if="divers !== null && childStopEntry !== null"
         />
@@ -294,6 +296,7 @@
      * @property {!{ record: !Record, children: !Array.<!Object>, isOpened: !Boolean, isSelected: !Boolean }} data
      * @property {!String} field
      * @property {!Function} flat
+     * @property {!Function} includes
      * @property {!Function} select
      */
 
@@ -381,6 +384,20 @@
             node.children.forEach(child => data = __flat(child, data));
             return data;
         };
+        const __includes = (property, value, node) => {
+            if (node === undefined) {
+                node = __data;
+            }
+            if (node.record[property].get().includes(value)) {
+                return true;
+            }
+            for (var index = 0; index < node.children.length; index++) {
+                if (__includes(property, value, node.children[index])) {
+                    return true;
+                }
+            }
+            return false;
+        };
         const __select = (stopID, node) => {
             if (node === undefined) {
                 node = __data;
@@ -388,7 +405,7 @@
             node.isSelected = stopID.length != 0 && node.record['stop_id'].get() === stopID;
             node.children.forEach(child => __select(stopID, child));
         };
-        return { contains: __contains, data: __data, field: 'parent_station', flat: __flat, select: __select };
+        return { contains: __contains, data: __data, field: 'parent_station', flat: __flat, includes: __includes, select: __select };
     }
 
     /**
@@ -1691,7 +1708,11 @@
 
             /** @type {!Function} */
             this.stopItems = () => {
-                const __sort = (a, b) => a['stop_sequence'].get() < b['stop_sequence'].get() ? 0 : 1;
+                const __sort = (a, b) => {
+                    a = parseInt(a['stop_sequence'].get(), 10);
+                    b = parseInt(b['stop_sequence'].get(), 10);
+                    return a < b ? -1 : (b < a ? 1 : 0);
+                };
                 const items = this.record['trip_id'].children.filter(child => child.field.file.identifier === 'stop_times').map(entry => entry.record);
                 const shadow = this.dataset.get('stop_times').shadowRecord;
                 const tripID = this.record['trip_id'].get();
@@ -1708,10 +1729,9 @@
             this.stopMove = (index, direction) => {
                 const stop_times = this.stopItems();
                 if (direction === 'up' ? 0 < index : index + 1 < stop_times.length ) {
-                    const other = stop_times[direction === 'up' ? index - 1 : index + 1];
-                    const stop_sequence = stop_times[index]['stop_sequence'].get();
-                    stop_times[index]['stop_sequence'].set(other['stop_sequence'].get());
-                    other['stop_sequence'].set(stop_sequence);
+                    const that = stop_times[index]['stop_sequence'];
+                    const other = stop_times[direction === 'up' ? index - 1 : index + 1]['stop_sequence'];
+                    [ other.data, that.data ] = [ that.data, other.data ];
                     this.stopsKey += 1;
                 }
             }
@@ -2196,9 +2216,13 @@
             },
             /**
              * @param {!Entry} childStopEntry
+             * @param {!Entry|undefined} currentStation
              * @returns {!Array.<!Object>}
              */
-            gtfsStopTrees(childStopEntry) {
+            gtfsStopTrees(childStopEntry, currentStation) {
+                if (currentStation === undefined) {
+                    currentStation = null;
+                }
                 const trees = new Array();
                 if (childStopEntry instanceof Entry) {
                     const stopID = childStopEntry.get();
@@ -2208,7 +2232,7 @@
                     this.dataset.get('stops').records.forEach(record => {
                         const isStation = record['location_type'].get() === station || record['location_type'].get() === stop;
                         if (record['parent_station'].isEmpty() && (!onlyStations || isStation)) {
-                            const tree = gtfsStopTree(record, onlyStations);
+                            const tree = gtfsStopTree(record, onlyStations, record.__isEqual(currentStation));
                             tree.select(stopID);
                             trees.push(tree);
                         }

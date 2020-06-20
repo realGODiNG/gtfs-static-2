@@ -26,6 +26,14 @@
                         :value="new String()"
                         @click="childStopEntry = data.value"
                         size="sm"
+                        v-if="needsStopPicker(data.value)"
+                    />
+                    <b-form-input type="text"
+                        :placeholder="data.value.getDisplayText()"
+                        :value="new String()"
+                        @click="childEntry = data.value;"
+                        size="sm"
+                        v-else
                     />
                 </fragment>
                 <fragment v-else-if="data.value.isChild()">
@@ -48,12 +56,17 @@
                         :pattern="data.value.fieldType.structure.getInputPattern()"
                         :type="data.value.fieldType.structure.getInputType()"
                         :value="data.value.get()"
-                        @change="data.value.set($event)"
+                        @change="__innerSet(data.value, $event)"
                         size="sm"
                     />
                 </fragment>
             </template>
         </b-table>
+        <SimplePicker :entry="childEntry"
+            :setter="__set"
+            @close="childEntry = null"
+            v-if="childEntry !== null"
+        />
         <SimpleStop :entry="childStopEntry"
             :setter="__set"
             :trees="gtfsStopTrees(childStopEntry)"
@@ -64,16 +77,21 @@
 </template>
 
 <script>
+    import SimplePicker from './SimplePicker'
     import SimpleStop from './SimpleStop'
 
     export default {
         name: 'SimpleTable',
         components: {
+            SimplePicker,
             SimpleStop
         },
 
         data() {
             return {
+                /** @type {?Entry} */
+                childEntry: null,
+
                 /** @type {?Entry} */
                 childStopEntry: null,
 
@@ -85,6 +103,7 @@
             'fields': Function,
             'items': Function,
             'move': Function,
+            'needsStopPicker': Function,
             'refresh': Function,
             'gtfsStopTrees': Function
         },
@@ -117,7 +136,28 @@
             __set(entry, data) {
                 entry.set(data);
                 this.mainKey += 1;
-            }
+            },
+            /**
+             * @param {!Entry} entry
+             * @param {!String} data
+             */
+            __innerSet(entry, data) {
+                var regex = null;
+                switch (entry.fieldType.structure.identifier) {
+                    case 'Time':
+                        regex = data.match('[0-3]?\\d:[0-5]\\d|4[0-7]:[0-5]\\d');
+                        if (regex !== null && regex[0] === data) {
+                            entry.set(data + ':00');
+                            this.mainKey += 1;
+                        } else {
+                            entry.set(data);
+                        }
+                        break;
+                    default:
+                        entry.set(data);
+                        break;
+                }
+            },
         }
     };
 </script>

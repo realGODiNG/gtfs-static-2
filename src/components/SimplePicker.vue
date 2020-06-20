@@ -5,15 +5,13 @@
                 <slot name="header">
                     <b-navbar toggleable="lg" type="dark" variant="dark">
                         <b-navbar-brand>
-                            Select '{{ this.entry.field.name }}'
+                            Select '{{ entry.field.name }}'
                         </b-navbar-brand>
                         <b-navbar-nav class="ml-auto">
                             <b-nav-form>
                                 <b-form-input class="m-1" v-model="filterWrapper" placeholder="Filter" size="sm" />
                                 <b-icon class="m-1" icon="trash" @click="applyFilter(true)" :variant="filter.length != 0 ? 'light' : 'dark'" />
-                                <b-button class="m-1" @click="applyFilter()" variant="light" size="sm">
-                                    Apply
-                                </b-button>
+                                <b-icon class="m-1" icon="search" @click="applyFilter()" variant="light" />
                             </b-nav-form>
                         </b-navbar-nav>
                     </b-navbar>
