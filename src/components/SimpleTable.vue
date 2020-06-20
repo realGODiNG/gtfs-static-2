@@ -39,7 +39,8 @@
                 <fragment v-else-if="data.value.isChild()">
                     <b-form-select :value="data.value.get()" size="sm" @change="data.value.set($event)">
                         <b-form-select-option :value="''" />
-                        <option v-for="parent in data.value.getPossibleParents()" :key="parent.get()">
+                        <!-- BAD PERFORMANCE: <option v-for="parent in data.value.getPossibleParents()" :key="parent.get()"> -->
+                        <option v-for="(parent, index) in data.value.getPossibleParents()" :key="index">
                             {{ parent.get() }}
                         </option>
                     </b-form-select>

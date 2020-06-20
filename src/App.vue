@@ -108,7 +108,8 @@
                     <fragment v-else-if="data.value.isChild()">
                         <b-form-select :value="data.value.get()" size="sm" @change="data.value.set($event)">
                             <b-form-select-option :value="''" />
-                            <option v-for="parent in data.value.getPossibleParents()" :key="parent.get()">
+                            <!-- BAD PERFORMANCE: <option v-for="parent in data.value.getPossibleParents()" :key="parent.get()"> -->
+                            <option v-for="(parent, index) in data.value.getPossibleParents()" :key="index">
                                 {{ parent.get() }}
                             </option>
                         </b-form-select>
@@ -225,7 +226,8 @@
                             <fragment v-else-if="element.entry.isChild()">
                                 <b-form-select :value="element.entry.get()" @change="divers.set(element.entry, $event)" size="sm">
                                     <b-form-select-option :value="''" />
-                                    <option v-for="parent in element.entry.getPossibleParents()" :key="parent.get()" :value="parent.get()">
+                                    <!-- BAD PERFORMANCE: <option v-for="parent in element.entry.getPossibleParents()" :key="parent.get()" :value="parent.get()"> -->
+                                    <option v-for="(parent, index) in element.entry.getPossibleParents()" :key="index" :value="parent.get()">
                                         {{ parent.getDisplayText() }}
                                     </option>
                                 </b-form-select>
@@ -290,6 +292,37 @@
     import $ from 'jquery'
     import JSZip from 'jszip'
     import saveAs from 'file-saver'
+
+    /**
+     * @param {!Entry} calendarDate
+     * @returns {!Array.<!Entry>}
+     */
+    // eslint-disable-next-line
+    function bonusCalendarDateChildren(calendarDate) {
+        if (calendarDate.field.file.identifier !== 'calendar_dates' || calendarDate['service_id'].isEmpty()) {
+            return new Array();
+        }
+        const service_id = calendarDate['service_id'].get();
+        return calendarDate.field.file.dataset.get('trips').records.flatMap(trip => {
+            const entry = trip['service_id'];
+            return entry.get() === service_id ? entry : [];
+        });
+    }
+    /**
+     * @param {!Entry} shape
+     * @returns {!Array.<!Entry>}
+     */
+    // eslint-disable-next-line
+    function bonusShapeChildren(shape) {
+        if (shape.field.file.identifier !== 'shapes' || shape['shape_id'].isEmpty()) {
+            return new Array();
+        }
+        const shape_id = shape['shape_id'].get();
+        return shape.field.file.dataset.get('trips').records.flatMap(trip => {
+            const entry = trip['shape_id'];
+            return entry.get() === shape_id ? entry : [];
+        });
+    }
 
     /**
      * @typedef {Object} Tree
@@ -951,10 +984,25 @@
          * @returns {!Array.<!Entry>}
          */
         getEntries() {
-            return this.file.records.flatMap(record => {
-                const entry = record[this.identifier];
-                return !entry.isEmpty() ? entry : [];
-            });
+            const entries = new Array();
+            switch (this.getFullIdentifier()) {
+                case 'calendar_dates.service_id':
+                    // fallsthrough
+                case 'shapes.shape_id':
+                    this.file.records.forEach(record => {
+                        const newEntry = record[this.identifier];
+                        // BAD PERFORMANCE: if (!newEntry.isEmpty() && entries.find(entry => entry.get() === newEntry.get()) === undefined) {
+                        if (newEntry.data.length != 0 && entries.find(entry => entry.data === newEntry.data) === undefined) {
+                            entries.push(newEntry);
+                        }
+                    });
+                    return entries;
+                default:
+                    return this.file.records.flatMap(record => {
+                        const entry = record[this.identifier];
+                        return !entry.isEmpty() ? entry : [];
+                    });
+            }
         }
     }
 
@@ -1039,7 +1087,12 @@
         }
 
         __afterDatasetLoaded() {
-            this.__file.fields.forEach(field => this[field.identifier].afterDatasetLoaded());
+            // BAD PERFORMANCE: this.__file.fields.forEach(field => this[field.identifier].afterDatasetLoaded());
+            this.__file.fields.forEach(field => {
+                if (field.types.reduce((type, isChild) => isChild || type.parent !== null, false)) {
+                    this[field.identifier].afterDatasetLoaded();
+                } 
+            });
         }
 
         /**
@@ -1116,8 +1169,10 @@
                 if (data.length != 0) {
                     var record = this.fieldType.parent.file.records.find(record => {
                         const entry = record[this.fieldType.parent.identifier];
-                        entry.afterDatasetLoaded();
-                        return entry.get() === data;
+                        // BAD PERFORMANCE: entry.afterDatasetLoaded();
+                        /** empty line */
+                        // BAD PERFORMANCE: return entry.get() === data;
+                        return entry.data === data;
                     });
                     switch (this.field.getFullIdentifier()) {
                         case 'trips.service_id':
@@ -1127,8 +1182,10 @@
                                 this.setFieldType(this.field.types[1]);
                                 record = this.fieldType.parent.file.records.find(record => {
                                     const entry = record[this.fieldType.parent.identifier];
-                                    entry.afterDatasetLoaded();
-                                    return entry.get() === data;
+                                    // BAD PERFORMANCE: entry.afterDatasetLoaded();
+                                    /** empty line */
+                                    // BAD PERFORMANCE: return entry.get() === data;
+                                    return entry.data === data;
                                 });
                                 if (record instanceof Record) {
                                     this.set(record[this.fieldType.parent.identifier]);
@@ -1173,7 +1230,8 @@
          * @returns {!Boolean}
          */
         isChild() {
-            return this.fieldType.isChild();
+            // BAD PERFORMANCE: return this.fieldType.isChild();
+            return this.fieldType.parent !== null;
         }
         /**
          * @returns {!Boolean}
@@ -1198,7 +1256,8 @@
          * @returns {!String}
          */
         get() {
-            return !this.record.__isShadow && this.isChild() ? this.data !== null ? this.data.get() : '' : this.data;
+            // BAD PERFORMANCE: return !this.record.__isShadow && this.isChild() ? this.data !== null ? this.data.get() : '' : this.data;
+            return this.record.__isShadow || this.fieldType.parent === null ? this.data : this.data === null ? '' : this.data.data;
         }
         /**
          * @returns {!String}

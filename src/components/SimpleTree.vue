@@ -18,8 +18,9 @@
                         <span v-if="entry !== undefined">
                             <fragment v-if="index == fields.length - 1">
                                 <b-form-select :value="entry.get()" size="sm" @change="entry.set($event)">
-                                    <option v-for="parent in root.flat().map(record => record['stop_id'])" :key="parent.get()">
-                                        {{ parent.get() }}
+                                    <!-- BAD PERFORMANCE: <option v-for="parent in root.flat().map(record => record['stop_id'])" :key="parent.get()"> -->
+                                    <option v-for="stopID in stopIDs" :key="stopID">
+                                        {{ stopID }}
                                     </option>
                                 </b-form-select>
                             <span class="centered">
@@ -29,7 +30,8 @@
                             <fragment v-else-if="entry.isChild()">
                                 <b-form-select :value="entry.get()" size="sm" @change="entry.set($event)">
                                     <b-form-select-option :value="''" />
-                                    <option v-for="parent in entry.getPossibleParents()" :key="parent.get()">
+                                    <!-- BAD PERFORMANCE: <option v-for="parent in entry.getPossibleParents()" :key="parent.get()"> -->
+                                    <option v-for="(parent, index) in entry.getPossibleParents()" :key="index">
                                         {{ parent.get() }}
                                     </option>
                                 </b-form-select>
@@ -151,6 +153,15 @@
             toogle() {
                 this.root.isOpened = !this.root.isOpened;
                 this.handler('refresh');
+            }
+        },
+
+        computed: {
+            /**
+             * @returns {!Array.<!String>}
+             */
+            stopIDs() {
+                return this.root.flat().map(record => record['stop_id'].get());
             }
         }
     };
