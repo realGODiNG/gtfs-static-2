@@ -6,7 +6,7 @@ npm install jquery
 npm install vue bootstrap-vue bootstrap
 npm install gtfs-realtime-bindings
 npm install --save vue-fragment
-npm install --save v-calendar
+npm install --save v-calendar@next
 npm install --save jszip
 npm install --save file-saver
 npm install --save mapbox-gl
