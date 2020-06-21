@@ -1,8 +1,9 @@
 <template>
     <fragment>
         <div id="simple-map" :key="mainKey" />
-        <div v-for="(record, index) in data" :key="'marker-' + index" :id="'marker-' + index" :class="(isSelected(record) ? 'h2' : 'h4') + ' mb-2'">
+        <div v-for="(record, index) in data" :key="'marker-' + index" :id="'marker-' + index">
             <b-icon icon="geo-alt" :variant="getVariant(index)"
+                :class="(isSelected(record) ? 'h2' : 'h4') + ' mb-2'"
                 v-b-tooltip.hover="{ placement: 'top', title: getDisplayText(index) }"
                 @click="select(record)"
                 v-if="isShown(index)"
@@ -63,7 +64,7 @@
                     "customAttribution": '<a href="https://www.openstreetmap.org/">© OpenStreetMap contributors</a>'
                 },
                 center: [ center.lon, center.lat ],
-                zoom: 17
+                zoom: 16
             });
             this.markers.length = 0;
             for (var index = 0; index < this.data.length; index++) {
@@ -72,6 +73,17 @@
                     new mapboxgl.Marker(document.getElementById('marker-' + index)).setLngLat([ position.lon, position.lat ]).addTo(this.map)
                 );
             }
+            this.map.on('contextmenu', event => {
+                if (event.originalEvent.ctrlKey) {
+                    var index = 0;
+                    for (; index < this.data.length; index++) {
+                        if (this.isSelected(this.data[index])) {
+                            break;
+                        }
+                    }
+                    this.setPosition(index, { lat: event.lngLat.lat, lon: event.lngLat.lng })
+                }
+            });
         },
         props: {
             'data': Array,

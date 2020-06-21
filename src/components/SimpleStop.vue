@@ -14,6 +14,11 @@
                                 <b-icon class="m-1" icon="search" @click="applyFilter()" variant="light" />
                             </b-nav-form>
                         </b-navbar-nav>
+                        <b-navbar-nav class="ml-auto">
+                            <b-nav-form>
+                                <b-icon class="h3 m-1" icon="x-circle-fill" @click="close()" variant="danger" />
+                            </b-nav-form>
+                        </b-navbar-nav>
                     </b-navbar>
                 </slot>
             </header>
@@ -30,12 +35,14 @@
             </section>
             <footer id="simple-stop-footer" class="centered">
                 <slot name="footer">
-                    <b-button class="m-1" size="sm" type="button" variant="dark" @click="handler('select', null)">
-                        Clear
-                    </b-button>
-                    <b-button class="m-1" size="sm" type="button" variant="dark" @click="close()">
-                        Cancel
-                    </b-button>
+                    <b-card>
+                        <b-button class="m-1" type="button" variant="dark" @click="handler('select', null)">
+                            Clear
+                        </b-button>
+                        <b-button class="m-1" type="button" variant="dark" @click="close()">
+                            Cancel
+                        </b-button>
+                    </b-card>
                 </slot>
             </footer>
         </div>

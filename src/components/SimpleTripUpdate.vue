@@ -7,6 +7,11 @@
                         <b-navbar-brand>
                             Add 'Trip Update'
                         </b-navbar-brand>
+                        <b-navbar-nav class="ml-auto">
+                            <b-nav-form>
+                                <b-icon class="h3 m-1" icon="x-circle-fill" @click="close(false)" variant="danger" />
+                            </b-nav-form>
+                        </b-navbar-nav>
                     </b-navbar>
                 </slot>
             </header>
@@ -81,12 +86,14 @@
             </section>
             <footer id="simple-trip-update-footer" class="centered">
                 <slot name="footer">
-                    <b-button class="m-1" type="button" @click="close(true)" variant="dark" :disabled="!isSaveable">
-                        Save
-                    </b-button>
-                    <b-button class="m-1" type="button" @click="close(false)" variant="dark">
-                        Discard
-                    </b-button>
+                    <b-card>
+                        <b-button class="m-1" type="button" @click="close(true)" variant="dark" :disabled="!isSaveable">
+                            Save
+                        </b-button>
+                        <b-button class="m-1" type="button" @click="close(false)" variant="dark">
+                            Discard
+                        </b-button>
+                    </b-card>
                 </slot>
             </footer>
         </div>

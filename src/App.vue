@@ -60,6 +60,11 @@
                         Add Record
                     </b-nav-item>
                 </b-navbar-nav>
+                <b-nav-form class="ml-auto" v-if="table !== null">
+                    <b-form-input class="m-1" v-model="table.filterWrapper" placeholder="Filter" size="sm" />
+                    <b-icon class="m-1" icon="trash" @click="table.applyFilter(true)" :variant="table.filter.length != 0 ? 'light' : 'dark'" />
+                    <b-icon class="m-1" icon="search" @click="table.applyFilter()" variant="light" />
+                </b-nav-form>
                 <b-navbar-nav class="ml-auto">
                     <b-nav-item id="dataset-filename" disabled v-if="dataset !== null">
                         <span v-if="table === null">
@@ -96,11 +101,16 @@
                             @click="table.callback(data.item)"
                             v-if="table.callback !== null"
                         />
-                        <b-icon class="m-1" icon="trash"
-                            v-b-tooltip.hover="{ placement: 'top', title: 'Delete record.' }"
-                            @click="table.deleteRecord(data.item)"
-                            v-else
-                        />
+                        <fragment v-else>
+                            <b-icon class="m-1" icon="pen"
+                                v-b-tooltip.hover="{ placement: 'top', title: 'Edit record.' }"
+                                @click="currentRecord = data.item"
+                            />
+                            <b-icon class="m-1" icon="trash"
+                                v-b-tooltip.hover="{ placement: 'top', title: 'Delete record.' }"
+                                @click="table.deleteRecord(data.item)"
+                            />
+                        </fragment>
                     </span>
                     <fragment v-else-if="table.callback !== null">
                         <b-form-input :value="data.value.get()" size="sm" disabled />
@@ -188,14 +198,20 @@
                                         :root="divers.tree"
                                     />
                                 </span>
-                                <div id="map" :key="divers.mapKey" v-else-if="element.action.special === 'stops.map'">
-                                    <SimpleMap
-                                        :data="divers.tree.flat()"
-                                        :isSelected="divers.mapIsSelect"
-                                        :refreshParent="divers.stationRefresh"
-                                        :select="divers.mapSelect"
-                                    />
-                                </div>
+                                <fragment v-else-if="element.action.special === 'stops.map'">
+                                    <div id="map" :key="divers.mapKey">
+                                        <SimpleMap
+                                            :data="divers.tree.flat()"
+                                            :isSelected="divers.mapIsSelect"
+                                            :refreshParent="divers.stationRefresh"
+                                            :select="divers.mapSelect"
+                                        />
+                                        
+                                    </div>
+                                    <div class="centered">
+                                        Use "ctrl + right-click" to set position.
+                                    </div>
+                                </fragment>
                                 <span :key="divers.transfersKey" v-else-if="element.action.special === 'stops.transfers'">
                                     <SimpleTable :fields="divers.transferFields" :items="divers.transferItems" :move="null"
                                         :needsStopPicker="needsStopPicker" :gtfsStopTrees="x => gtfsStopTrees(x, divers.record)"
@@ -269,6 +285,7 @@
             @close="childEntry = null; divers.update($event ? 'full' : ''); divers.key += $event"
             v-if="divers !== null && childEntry !== null"
         />
+        <SimpleRecord :record="currentRecord" @close="currentRecord = null" v-if="currentRecord !== null" />
         <SimpleStop :entry="childStopEntry"
             :setter="divers.set"
             :trees="gtfsStopTrees(childStopEntry, divers.record)"
@@ -283,6 +300,7 @@
 <script>
     import SimpleMap from './components/SimpleMap.vue'
     import SimplePicker from './components/SimplePicker.vue'
+    import SimpleRecord from './components/SimpleRecord.vue'
     import SimpleStop from './components/SimpleStop.vue'
     import SimpleTable from './components/SimpleTable.vue'
     import SimpleTree from './components/SimpleTree.vue'
@@ -298,7 +316,7 @@
      * @returns {!Array.<!Entry>}
      */
     // eslint-disable-next-line
-    function bonusCalendarDateChildren(calendarDate) {
+    function getCalendarDateChildren(calendarDate) {
         if (calendarDate.field.file.identifier !== 'calendar_dates' || calendarDate['service_id'].isEmpty()) {
             return new Array();
         }
@@ -313,7 +331,7 @@
      * @returns {!Array.<!Entry>}
      */
     // eslint-disable-next-line
-    function bonusShapeChildren(shape) {
+    function getShapeChildren(shape) {
         if (shape.field.file.identifier !== 'shapes' || shape['shape_id'].isEmpty()) {
             return new Array();
         }
@@ -322,6 +340,30 @@
             const entry = trip['shape_id'];
             return entry.get() === shape_id ? entry : [];
         });
+    }
+    /**
+     * @param {!Record} trip
+     * @returns {!Array.<!Record>}
+     */
+    // eslint-disable-next-line
+    function getTripCalendarDates(trip) {
+        if (trip.__file.identifier !== 'trips' || trip['service_id'].isEmpty()) {
+            return new Array();
+        }
+        const service_id = trip['service_id'].get();
+        return trip.__file.dataset.get('calendar_dates').records.filter(calenderDate => calenderDate['service_id'].get() === service_id);
+    }
+    /**
+     * @param {!Record} trip
+     * @returns {!Array.<!Record>}
+     */
+    // eslint-disable-next-line
+    function getTripShapes(trip) {
+        if (trip.__file.identifier !== 'trips' || trip['shape_id'].isEmpty()) {
+            return new Array();
+        }
+        const shape_id = trip['shape_id'].get();
+        return trip.__file.dataset.get('shapes').records.filter(shape => shape['shape_id'].get() === shape_id);
     }
 
     /**
@@ -583,8 +625,11 @@
         isScheduleBasedTrip(record) {
             if (record.__file.identifier !== 'trips' || this.isFrequencyBasedTrip(record)) {
                 return false;
+            } else if (record['service_id'].fieldType.parent.file.identifier === 'calendar') {
+                return true;
             }
-            return record['service_id'].fieldType.parent.file.identifier === 'calendar'; 
+            const service_id = record['service_id'].get();
+            return service_id.length != 0 && record['service_id'].fieldType.parent.file.records.reduce((sum, record) => sum + (record['service_id'].get() === service_id), 0) > 1;
         }
 
         /**
@@ -606,12 +651,12 @@
             tripUpdate['trip'] = new Object();
             var trip = tripUpdate['trip'];
             trip['tripId'] = record['trip_id'].get();
-            /*
-             * if (this.isScheduleBasedTrip(record)) {
-             *     trip['route_id'] = record['route_id'].get();
-             *     trip['direction_id'] = Number.parseInt(record['direction_id'].fieldType.enumeration.fromHTML(record['direction_id'].get()));
-             * }
-             */
+            if (!record['route_id'].isEmpty()) {
+                trip['route_id'] = record['route_id'].get();
+            }
+            if (!record['direction_id'].isEmpty()) {
+                trip['direction_id'] = Number.parseInt(record['direction_id'].fieldType.enumeration.fromHTML(record['direction_id'].get()), 10);
+            }
             if (time.length != 0) {
                 trip['startTime'] = time;
             }
@@ -987,13 +1032,20 @@
             const entries = new Array();
             switch (this.getFullIdentifier()) {
                 case 'calendar_dates.service_id':
-                    // fallsthrough
+                    this.file.records.forEach(record => {
+                        const service_id = record['service_id'];
+                        // BAD PERFORMANCE: if (!service_id.isChild() && !service_id.isEmpty() && entries.find(entry => entry.get() === service_id.get()) === undefined) {
+                        if (typeof service_id.data === 'string' && service_id.data.length != 0 && entries.find(entry => entry.data === service_id.data) === undefined) {
+                            entries.push(service_id);
+                        }
+                    });
+                    return entries;
                 case 'shapes.shape_id':
                     this.file.records.forEach(record => {
-                        const newEntry = record[this.identifier];
-                        // BAD PERFORMANCE: if (!newEntry.isEmpty() && entries.find(entry => entry.get() === newEntry.get()) === undefined) {
-                        if (newEntry.data.length != 0 && entries.find(entry => entry.data === newEntry.data) === undefined) {
-                            entries.push(newEntry);
+                        const shape_id = record['shape_id'];
+                        // BAD PERFORMANCE: if (!shape_id.isEmpty() && entries.find(entry => entry.get() === shape_id.get()) === undefined) {
+                        if (shape_id.data.length != 0 && entries.find(entry => entry.data === shape_id.data) === undefined) {
+                            entries.push(shape_id);
                         }
                     });
                     return entries;
@@ -1360,7 +1412,7 @@
             if (data === null || this.fieldType.name === data.name) {
                 return false;
             }
-            this.data.clear();
+            this.clear();
             this.fieldType = data;
             this.data = this.isChild() ? null : '';
             return true;
@@ -1382,8 +1434,35 @@
                 if (this.isChild()) {
                     this.data.children.splice(this.data.children.findIndex(entry => entry.isEqual(this)), 1);
                 }
-                this.children.forEach(entry => entry.clear());
-                this.children.length = 0;
+                switch (this.field.getFullIdentifier()) {
+                    case 'calendar_dates.service_id':
+                        // fallsthrough
+                    case 'shapes.shape_id':
+                        if (this.children.length != 0) {
+                            const other = this.field.file.records.find(record => {
+                                const entry = record[this.field.identifier];
+                                return record.__index != this.record.__index
+                                    && entry.get() == this.get()
+                                    && entry.fieldType.name === this.fieldType.name;
+                            });
+                            if (other !== undefined) {
+                                const entry = other[this.field.identifier];
+                                this.children.forEach(child => {
+                                    child.data = entry;
+                                    entry.children.push(child);
+                                });
+                                this.children.length = 0;
+                            } else {
+                                this.children.forEach(entry => entry.clear());
+                                this.children.length = 0;
+                            }
+                        }
+                        break;
+                    default:
+                        this.children.forEach(entry => entry.clear());
+                        this.children.length = 0;
+                        break;
+                }
                 this.data = this.isChild() ? null : '';
             }
             return true;
@@ -1393,14 +1472,18 @@
     class Table {
         /**
          * @param {!Dataset} dataset
+         * @param {?Object} vue
          * @param {!String} fileIdentifier
          * @param {?Array.<!String>} fieldIdentifiers
          * @param {?Function} callback
-         * @param {!Function|undefined} filter
+         * @param {!Function|undefined} preFilter
          */
-        constructor(dataset, fileIdentifier, fieldIdentifiers, callback, filter) {
+        constructor(dataset, vue, fileIdentifier, fieldIdentifiers, callback, preFilter) {
             /** @type {!Dataset} */
             this.dataset = dataset;
+
+            /** @type {!Object} */
+            this.vue = vue;
 
             /** @type {?File} */
             this.file = dataset.get(fileIdentifier);
@@ -1412,7 +1495,7 @@
             this.callback = callback;
 
             /** @type {?Function} */
-            this.filter = filter !== undefined ? filter : null;
+            this.preFilter = preFilter !== undefined ? preFilter : null;
 
             /** @type {!Number} */
             this.currentPage = 1;
@@ -1422,6 +1505,23 @@
 
             /** @type {!Number} */
             this.key = 0;
+
+            /** @type {!String} */
+            this.filterWrapper = '';
+
+            /** @type {!String} */
+            this.filter = '';
+        }
+
+        /**
+         * @param {!Boolean|undefined} reset
+         */
+        applyFilter(reset) {
+            if (reset !== undefined ? reset : false) {
+                this.filterWrapper = '';
+            }
+            this.filter = this.filterWrapper;
+            this.key += 1;
         }
 
         /**
@@ -1436,11 +1536,23 @@
          * @returns {!Array.<!Record>}
          */
         getRecords() {
-            return this.filter !== null ? this.file.records.filter(record => this.filter(record)) : this.file.records;
+            const records = this.preFilter !== null ? this.file.records.filter(record => this.preFilter(record)) : this.file.records;
+            return this.filter.length != 0 ? records.filter(record => {
+                    for (var index = 0; index < this.file.fields.length; index++) {
+                        if (record[this.file.fields[index].identifier].get().includes(this.filter)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }) : records;
         }
 
         createRecord () {
-            this.file.createRecord();
+            if (this.vue !== null) {
+                this.vue.currentRecord = this.file.createRecord();
+            } else {
+                this.file.createRecord();
+            }
             this.key += 1;
         }
         /**
@@ -1869,25 +1981,6 @@
                 ]
             });
 
-            const createService = {
-                callback: () => this.vue.texterWrapper = {
-                    callback: serviceID => {
-                        const service = this.dataset.get('calendar').createRecord([{ property: 'service_id', value: serviceID }]);
-                        this.set(this.record['service_id'], service['service_id']);
-                    },
-                    title: 'Service ID'
-                },
-                icon: null,
-                text: 'New'
-            };
-            this.mockups.find(mockup => mockup.title === 'Service Days').table.push({
-                key: 'service-days-row-1',
-                data: [
-                    { action: null, colspan: 2, entry: this.record['service_id'], label: 'Service ID', rowspan: 1 },
-                    { action: createService, colspan: 7, entry: null, label: null, rowspan: 1 }
-                ]
-            });
-
             this.mockups.find(mockup => mockup.title === 'Stops').table.push({
                 key: 'stops-row-1',
                 data: [
@@ -1918,8 +2011,9 @@
 
             const serviceDaysTable = this.mockups.find(mockup => mockup.title === 'Service Days').table;
             const service = !this.record['service_id'].isEmpty() ? this.record['service_id'].data.record : null;
-            const startDate = service instanceof Record ? service['start_date'] : null;
-            const endDate = service instanceof Record ? service['end_date'] : null;
+            const isCalendar = this.record['service_id'].fieldType.name === this.record['service_id'].field.types[0].name;
+            const startDate = service instanceof Record && isCalendar ? service['start_date'] : null;
+            const endDate = service instanceof Record && isCalendar ? service['end_date'] : null;
 
             switch (updateKey) {
                 case 'full':
@@ -1958,55 +2052,107 @@
                         });
                     }
 
-                    serviceDaysTable.length = 1;
-                    if (service instanceof Record) {
-                        serviceDaysTable.push({
-                            key: 'service-days-row-2',
+                    {
+                        const createService = {
+                            callback: () => this.vue.texterWrapper = {
+                                callback: serviceID => {
+                                    if (isCalendar) {
+                                        const service = this.dataset.get('calendar').createRecord([ { property: 'service_id', value: serviceID } ]);
+                                        this.set(this.record['service_id'], service['service_id']);
+                                    } else {
+                                        const service = this.dataset.get('calendar_dates').createRecord();
+                                        const service_id = service['service_id'];
+                                        service_id.setFieldType(service_id.field.types[1]);
+                                        service_id.set(serviceID);
+                                        this.set(this.record['service_id'], service_id);
+                                    }
+                                },
+                                title: 'Service ID'
+                            },
+                            icon: null,
+                            text: 'New'
+                        };
+                        const toogleService = {
+                            callback: () => {
+                                this.record['service_id'].setFieldType(this.record['service_id'].field.types[isCalendar ? 1 : 0]);
+                                this.update('full');
+                                this.key += 1;
+                            },
+                            icon: null,
+                            text: 'Use ' + (isCalendar ? 'Calendar Dates' : 'Calendar')
+                        };
+                        serviceDaysTable.length = 0;
+                        this.mockups.find(mockup => mockup.title === 'Service Days').table.push({
+                            key: 'service-days-row-1',
                             data: [
-                                { action: null, colspan: 1, entry: service['start_date'], label: 'Start Date', rowspan: 1 },
-                                { action: null, colspan: 1, entry: service['end_date'], label: 'End Date', rowspan: 1 },
-                                { action: null, colspan: 1, entry: service['monday'], label: 'Monday', rowspan: 1 },
-                                { action: null, colspan: 1, entry: service['tuesday'], label: 'Tuesday', rowspan: 1 },
-                                { action: null, colspan: 1, entry: service['wednesday'], label: 'Wednesday', rowspan: 1 },
-                                { action: null, colspan: 1, entry: service['thursday'], label: 'Thursday', rowspan: 1 },
-                                { action: null, colspan: 1, entry: service['friday'], label: 'Friday', rowspan: 1 },
-                                { action: null, colspan: 1, entry: service['saturday'], label: 'Saturday', rowspan: 1 },
-                                { action: null, colspan: 1, entry: service['sunday'], label: 'Sunday', rowspan: 1 }
+                                { action: null, colspan: 2, entry: this.record['service_id'], label: 'Service ID', rowspan: 1 },
+                                { action: createService, colspan: 6, entry: null, label: null, rowspan: 1 },
+                                { action: toogleService, colspan: 1, entry: null, label: null, rowspan: 1 }
                             ]
                         });
+                        if (service instanceof Record && isCalendar) {
+                            serviceDaysTable.push({
+                                key: 'service-days-row-2',
+                                data: [
+                                    { action: null, colspan: 1, entry: service['start_date'], label: 'Start Date', rowspan: 1 },
+                                    { action: null, colspan: 1, entry: service['end_date'], label: 'End Date', rowspan: 1 },
+                                    { action: null, colspan: 1, entry: service['monday'], label: 'Monday', rowspan: 1 },
+                                    { action: null, colspan: 1, entry: service['tuesday'], label: 'Tuesday', rowspan: 1 },
+                                    { action: null, colspan: 1, entry: service['wednesday'], label: 'Wednesday', rowspan: 1 },
+                                    { action: null, colspan: 1, entry: service['thursday'], label: 'Thursday', rowspan: 1 },
+                                    { action: null, colspan: 1, entry: service['friday'], label: 'Friday', rowspan: 1 },
+                                    { action: null, colspan: 1, entry: service['saturday'], label: 'Saturday', rowspan: 1 },
+                                    { action: null, colspan: 1, entry: service['sunday'], label: 'Sunday', rowspan: 1 }
+                                ]
+                            });
+                        }
                     }
                     // fallsthrough
-                case 'calendar':
-                    if (serviceDaysTable.length < 3 && service instanceof Record && !startDate.isEmpty() && !endDate.isEmpty()) {
-                        serviceDaysTable.push({
-                            key: 'service-days-row-3',
-                            data: [
-                                { action: { icon: null, text: null, special: 'trips.calendar' }, colspan: 9, rowspan: 1 }
-                            ]
-                        });
-                    }
-                    if (service instanceof Record && !startDate.isEmpty() && !endDate.isEmpty()) {
-                        const added = this.dataset.get('calendar_dates').get('exception_type').types[0].enumeration.toHTML('1');
-                        const removed = this.dataset.get('calendar_dates').get('exception_type').types[0].enumeration.toHTML('2');
-                        this.calendar.find(element => element.key === 'range').dates = {
+                case 'full-calendar':
+                    if (service instanceof Record && (!isCalendar || (!startDate.isEmpty() && !endDate.isEmpty()))) {
+                        if (serviceDaysTable.find(row => row.key === 'service-days-row-3') === undefined) {
+                            serviceDaysTable.push({
+                                key: 'service-days-row-3',
+                                data: [
+                                    { action: { icon: null, text: null, special: 'trips.calendar' }, colspan: 9, rowspan: 1 }
+                                ]
+                            });
+                        }
+                        this.calendar.find(element => element.key === 'range').dates = !isCalendar ? null : {
                             start: gtfsDate(startDate),
                             end: gtfsDate(endDate),
                             weekdays: [ 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday' ].flatMap((property, index) => {
                                 return service[property].get() === 'true' ? index + 1 : [];
                             })
                         };
-                        this.calendar.find(element => element.key === 'added').dates = service['service_id'].children.flatMap(date => {
-                            if (date.field.file.identifier !== 'calendar_dates' || date.record['date'].isEmpty()) {
-                                return [];
-                            }
-                            return date.record['exception_type'].get() === added ? gtfsDate(date.record['date']) : [];
-                        });
-                        this.calendar.find(element => element.key === 'removed').dates = service['service_id'].children.flatMap(date => {
-                            if (date.field.file.identifier !== 'calendar_dates' || date.record['date'].isEmpty()) {
-                                return [];
-                            }
-                            return date.record['exception_type'].get() === removed ? gtfsDate(date.record['date']) : [];
-                        });      
+                    }
+                    if (updateKey !== 'full' && updateKey !== 'full-calendar') {
+                        break;
+                    }
+                    // fallsthrough
+                case 'calendar':
+                    if (service instanceof Record && (!isCalendar || (!startDate.isEmpty() && !endDate.isEmpty()))) {
+                        const added = this.dataset.get('calendar_dates').get('exception_type').types[0].enumeration.toHTML('1');
+                        const removed = this.dataset.get('calendar_dates').get('exception_type').types[0].enumeration.toHTML('2');
+                        this.calendar.find(element => element.key === 'added').dates = isCalendar
+                            ? service['service_id'].children.flatMap(date => {
+                                if (date.field.file.identifier !== 'calendar_dates' || date.record['date'].isEmpty()) {
+                                    return [];
+                                }
+                                return date.record['exception_type'].get() === added ? gtfsDate(date.record['date']) : [];
+                            }) : this.dataset.get('calendar_dates').records.flatMap(date => {
+                                const serviceID = this.record['service_id'].get();
+                                return date['service_id'].get() === serviceID && !date['date'].isEmpty() && date['exception_type'].get() === added
+                                    ? gtfsDate(date['date'])
+                                    : [];
+                            });
+                        this.calendar.find(element => element.key === 'removed').dates = isCalendar ?
+                            service['service_id'].children.flatMap(date => {
+                                if (date.field.file.identifier !== 'calendar_dates' || date.record['date'].isEmpty()) {
+                                    return [];
+                                }
+                                return date.record['exception_type'].get() === removed ? gtfsDate(date.record['date']) : [];
+                            }) : null;
                     }
                     if (updateKey !== 'full') {
                         break;
@@ -2019,13 +2165,20 @@
 
         handleDate() {
             if (this.mockups.find(mockup => mockup.title === 'Service Days').table.find(row => row.key === 'service-days-row-3')) {
+                const isCalendar = this.record['service_id'].fieldType.name === this.record['service_id'].field.types[0].name;
                 const calenderDates = this.dataset.get('calendar_dates');
                 const serviceID = this.record['service_id'].get();
                 const pickedData = gtfsDate(this.vue.pickerDate);
                 const record = calenderDates.records.find(record => record['service_id'].get() === serviceID && record['date'].get() === pickedData);
                 if (record instanceof Record) {
-                    record.__delete();
-                } else {
+                    if (isCalendar || this.calendar.find(element => element.key === 'added').dates.length != 1) {
+                        record.__delete();
+                    } else {
+                        record['date'].clear();
+                        record['exception_type'].clear();
+                    }
+                    
+                } else if (isCalendar) {
                     const range = this.calendar.find(element => element.key === 'range').dates;
                     const pickedDay = this.vue.pickerDate.getDay() + 1;
                     const inRange = range.start <= this.vue.pickerDate
@@ -2036,6 +2189,20 @@
                         { property: 'date', value: pickedData },
                         { property: 'exception_type', value: calenderDates.get('exception_type').types[0].enumeration.toHTML(inRange ? '2' : '1') }
                     ]);
+                } else  {
+                    if (this.calendar.find(element => element.key === 'added').dates.length == 0) {
+                        const service = calenderDates.records.find(record => record['service_id'].get() === serviceID);
+                        service['date'].set(pickedData);
+                        service['exception_type'].set(calenderDates.get('exception_type').types[0].enumeration.toHTML('1'));
+                    } else {
+                        const service = calenderDates.createRecord([
+                            { property: 'date', value: pickedData },
+                            { property: 'exception_type', value: calenderDates.get('exception_type').types[0].enumeration.toHTML('1') }
+                        ]);
+                        const service_id = service['service_id'];
+                        service_id.setFieldType(service_id.field.types[1]);
+                        service_id.set(serviceID);
+                    }
                 }
                 this.vue.pickerDate = null;
                 this.update('calendar');
@@ -2073,7 +2240,7 @@
                     case 'calendar.saturday':
                         // fallsthrough
                     case 'calendar.sunday':
-                        this.update('calendar');
+                        this.update('full-calendar');
                         this.calendarKey += 1;
                         break;
                     default:
@@ -2088,6 +2255,7 @@
         components: {
             SimpleMap,
             SimplePicker,
+            SimpleRecord,
             SimpleStop,
             SimpleTable,
             SimpleTree,
@@ -2104,6 +2272,9 @@
                 childStopEntry: null,
 
                 /** @type {?Record} */
+                currentRecord: null,
+
+                /** @type {?Record} */
                 currentTrip: null,
 
                 /** @type {?{ callback: !Function, title: !String }} */
@@ -2117,12 +2288,6 @@
 
                 /** @type {?Table} */
                 table: null,
-
-                /** @type {?Station} */
-                station: null,
-
-                /** @type {?Trip} */
-                trip: null,
 
                 /** @type {?Object} */
                 divers: null,
@@ -2153,23 +2318,26 @@
 
         watch: {
             pickerDate(value) {
-                if (value instanceof Date && this.trip instanceof Trip) {
-                    this.trip.handleDate(value);
+                if (value instanceof Date && this.divers instanceof Trip) {
+                    this.divers.handleDate(value);
                 }
             }
         },
 
         methods: {
             createDataset() {
-                this.table = null;
-                this.divers = null;
-                this.station = null;
-                this.trip = null;
-                this.realtime.reset();
-                this.texterWrapper = { title: 'Filename', callback: filename => this.dataset.reset(filename) };
+                this.texterWrapper = {
+                    callback: filename => {
+                        this.table = null;
+                        this.divers = null;
+                        this.realtime.reset();
+                        this.dataset.reset(filename);
+                    },
+                    title: 'Filename'
+                };  
             },
             createRealtime() {
-                this.texterWrapper = { title: 'Filename', callback: filename => this.realtime.reset(filename) };
+                this.texterWrapper = { callback: filename => this.realtime.reset(filename), title: 'Filename' };
             },
             /**
              * @param {!Object} event
@@ -2177,8 +2345,6 @@
             loadDataset(event) {
                 this.table = null;
                 this.divers = null;
-                this.station = null;
-                this.trip = null;
                 this.realtime.reset();
                 this.dataset.load(event);
             },
@@ -2188,14 +2354,13 @@
              */
             createTable(fileIdentifier) {
                 this.divers = null;
-                this.station = null;
-                this.trip = null;
                 const station = this.dataset.get('stops').get('location_type').types[0].enumeration.toHTML('1');
                 const stop = this.dataset.get('stops').get('location_type').types[0].enumeration.toHTML('0');
                 switch(fileIdentifier) {
                     case '__stops':
                         this.table = new Table(
                             this.dataset,
+                            null,
                              'stops',
                             [ 'stop_id', 'stop_code', 'stop_name', 'stop_desc', 'stop_lat', 'stop_lon' ],
                             this.selectStation,
@@ -2208,6 +2373,7 @@
                     case '__trips':
                         this.table = new Table(
                             this.dataset,
+                            null,
                             'trips',
                             [ 'route_id', 'service_id', 'trip_id', 'trip_headsign', 'trip_short_name' ],
                             this.selectTrip,
@@ -2215,25 +2381,29 @@
                         );
                         break;
                     default:
-                        this.table = new Table(this.dataset, fileIdentifier, null, null);
+                        this.table = new Table(this.dataset, this, fileIdentifier, null, null);
                         break;
                 }
             },
             createStation() {
-                this.divers = null;
                 const station = this.dataset.get('stops').get('location_type').types[0].enumeration.toHTML('1');
                 this.texterWrapper = {
-                    callback: stopID => this.selectStation(this.dataset.get('stops').createRecord([
-                        { property: 'stop_id', value: stopID },
-                        { property: 'location_type', value: station }
-                    ])),
+                    callback: stopID => {
+                        this.divers = null;
+                        this.selectStation(this.dataset.get('stops').createRecord([
+                            { property: 'stop_id', value: stopID },
+                            { property: 'location_type', value: station }
+                        ]));
+                    },
                     title: 'Stop ID'
                 };
             },
             createTrip() {
-                this.divers = null;
                 this.texterWrapper = {
-                    callback: tripID => this.selectTrip(this.dataset.get('trips').createRecord([ { property: 'trip_id', value: tripID } ])),
+                    callback: tripID => {
+                        this.divers = null;
+                        this.selectTrip(this.dataset.get('trips').createRecord([ { property: 'trip_id', value: tripID } ]))
+                    },
                     title: 'Trip ID'
                 };
             },
@@ -2243,18 +2413,14 @@
              */
             selectStation(station) {
                 this.table = null;
-                this.trip = null;
-                this.station = station.__file.identifier === 'stops' ? new Station(station, this) : null;
-                this.divers = this.station;
+                this.divers = station.__file.identifier === 'stops' ? new Station(station, this) : null;
             },
             /**
              * @param {!Record} trip
              */
             selectTrip(trip) {
                 this.table = null;
-                this.station = null;
-                this.trip = trip.__file.identifier === 'trips' ? new Trip(trip, this) : null;
-                this.divers = this.trip;
+                this.divers = trip.__file.identifier === 'trips' ? new Trip(trip, this) : null;
             },
             /**
              * @param {!Entry} entry
@@ -2339,6 +2505,7 @@
     .popup-content {
         background-color: white;
         border: 2px solid #888;
+        max-height: 90%;
         left: 50%;
         position: absolute;
         top: 50%;

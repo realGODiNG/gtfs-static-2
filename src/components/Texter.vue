@@ -7,6 +7,11 @@
                         <b-navbar-brand>
                             '{{ wrapper.title }}'
                         </b-navbar-brand>
+                        <b-navbar-nav class="ml-auto">
+                            <b-nav-form>
+                                <b-icon class="h3 m-1" icon="x-circle-fill" @click="close(true)" variant="danger" />
+                            </b-nav-form>
+                        </b-navbar-nav>
                     </b-navbar>
                 </slot>
             </header>
@@ -19,9 +24,11 @@
             </section>
             <footer id="texter-footer" class="centered">
                 <slot name="footer">
-                    <b-button class="m-1" size="sm" type="button" variant="dark" @click="close()" :disabled='value.length == 0'>
-                        Confirm
-                    </b-button>
+                    <b-card>
+                        <b-button class="m-1" type="button" variant="dark" @click="close(false)" :disabled='value.length == 0'>
+                            Confirm
+                        </b-button>
+                    </b-card>
                 </slot>
             </footer>
         </div>
@@ -43,8 +50,13 @@
         },
 
         methods: {
-            close() {
-                this.wrapper.callback(this.value);
+            /**
+             * @param {!Boolean} canceled
+             */
+            close(canceled) {
+                if (!canceled) {
+                    this.wrapper.callback(this.value);
+                }
                 this.$emit('close');
             }
         }
