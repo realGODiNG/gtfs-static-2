@@ -49,6 +49,12 @@
             <footer id="simple-picker-footer" class="centered">
                 <slot name="footer">
                     <b-card>
+                        <b-button class="m-1" type="button" variant="dark"
+                            @click="currentRecord = entry.fieldType.parent.file.createRecord(); mainKey += 1"
+                            v-if="entry.fieldType.parent.getFullIdentifier() === 'levels.level_id'"
+                        >
+                            New ...
+                        </b-button>
                         <b-button class="m-1" type="button" variant="dark" @click="handler('select', null)">
                             Clear
                         </b-button>
@@ -59,12 +65,18 @@
                 </slot>
             </footer>
         </div>
+        <SimpleRecord :record="currentRecord" @close="currentRecord = null" v-if="currentRecord !== null" />
     </div>
 </template>
 
 <script>
+    import SimpleRecord from './SimpleRecord'
+
     export default {
         name: 'SimplePicker',
+        components: {
+            SimpleRecord
+        },
         
         data() {
             return {
@@ -75,7 +87,10 @@
                 filterWrapper: '',
 
                 /** @type {!String} */
-                filter: ''
+                filter: '',
+
+                /** @type {?Record} */
+                currentRecord: null
             }
         },
         props: {

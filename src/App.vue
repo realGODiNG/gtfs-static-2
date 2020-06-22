@@ -1,5 +1,5 @@
 <template>
-    <div id="app">
+    <div id="app" :key="mainKey">
         <input id="open-input-st" type="file" @change="loadDataset($event)" />
         <input id="open-input-rt" type="file" @change="realtime.load($event)" />
         <b-navbar id="main-menu" toggleable="lg" type="dark" variant="dark">
@@ -11,7 +11,7 @@
                         <b-dropdown-item @click="createDataset()">
                             New ...
                         </b-dropdown-item>
-                        <b-dropdown-item id="open-button-st">
+                        <b-dropdown-item @click="__loadDataset()">
                             Open ...
                         </b-dropdown-item>
                         <b-dropdown-item @click="dataset.save()">
@@ -22,7 +22,7 @@
                         <b-dropdown-item @click="createRealtime()">
                             New ...
                         </b-dropdown-item>
-                        <b-dropdown-item id="open-button-rt">
+                        <b-dropdown-item @click="__loadRealtime()">
                             Open ...
                         </b-dropdown-item>
                         <b-dropdown-item @click="realtime.save()">
@@ -173,6 +173,15 @@
                                 >
                                     {{ element.action.text }}
                                 </b-button>
+                                <fragment :key="divers.calendarKey" v-else-if="element.action.special === 'trips.realtimeUpdate'">
+                                    <b-button
+                                        @click="currentTrip = divers.record"
+                                        size="sm" type="button" variant="dark"
+                                        :disabled="divers.record['trip_id'].isEmpty() || divers.record['service_id'].isEmpty()"
+                                    >
+                                        Add Trip Update
+                                    </b-button>
+                                </fragment>
                                 <span :key="divers.calendarKey" v-else-if="element.action.special === 'trips.calendar'">
                                     <v-date-picker :attributes="divers.calendar"
                                         :columns="$screens({ default: 1, lg: 4 })"
@@ -307,7 +316,6 @@
     import SimpleTripUpdate from './components/SimpleTripUpdate.vue'
     import Texter from './components/Texter.vue'
 
-    import $ from 'jquery'
     import JSZip from 'jszip'
     import saveAs from 'file-saver'
 
@@ -1315,16 +1323,26 @@
          * @returns {!String}
          */
         getDisplayText() {
-            const displayText = this.get();
-            if (displayText.length == 0) {
+            if (this.isEmpty()) {
                 return '';
             }
-            var parentRecord;
+            const displayText = this.get();
+            const parentRecord = !this.isChild() ? this.record : this.record.__isShadow
+                // BAD PERFORMANCE: this.fieldType.parent.file.records.find(record => record[this.fieldType.parent.identifier].get() === this.data)
+                ? this.fieldType.parent.file.records.find(record => record[this.fieldType.parent.identifier].data === this.data)
+                : this.data.record;
+            if (parentRecord === undefined) {
+                return displayText;
+            }
             switch (this.field.getFullIdentifier()) {
-                case 'trips.agency_id':
-                    return '(' + displayText + ') ' + this.data.record['agency_name'].get();
+                case 'routes.agency_id':
+                    // fallsthrough
+                case 'agency.agency_id':
+                    return '(' + displayText + ') ' + parentRecord['agency_name'].get();
                 case 'trips.route_id':
-                    return '(' + displayText + ') ' + this.data.record['route_long_name'].get();
+                    // fallsthrough
+                case 'routes.route_id':
+                    return '(' + displayText + ') ' + parentRecord['route_long_name'].get();
                 case 'stops.parent_station':
                     // fallsthrough
                 case 'stop_times.stop_id':
@@ -1336,13 +1354,15 @@
                 case 'pathways.from_stop_id':
                     // fallsthrough
                 case 'pathways.to_stop_id':
-                    parentRecord = this.record.__isShadow
-                        ? this.fieldType.parent.file.records.find(record => record['stop_id'].get() === this.data)
-                        : this.data.record;
+                    // fallsthrough
+                case 'stops.stop_id':
                     return '(' + displayText + ') ' + parentRecord['stop_name'].get()
                         + (!parentRecord['platform_code'].isEmpty() ? ' - ' + parentRecord['platform_code'].get() : '');
                 case 'stops.level_id':
-                    return this.data.record['level_index'].get() + ' - ' + this.data.record['level_name'].get();
+                    // fallsthrough
+                case 'levels.level_id':
+                    return parentRecord['level_index'].get() + ' - ' + parentRecord['level_name'].get();
+
                 default:
                     return displayText;
             }
@@ -1933,11 +1953,6 @@
         }
 
         afterConstructed() {
-            const addTripUpdate = {
-                callback: () => this.vue.currentTrip = this.record,
-                icon: null,
-                text: 'Add Trip Update'
-            };
             this.mockups.find(mockup => mockup.title === 'Trip').table.push({
                 key: 'trip-row-1',
                 data: [
@@ -1957,9 +1972,7 @@
             });
             this.mockups.find(mockup => mockup.title === 'Trip').table.push({
                 key: 'trip-row-3',
-                data: [
-                    { action: addTripUpdate, colspan: 4, entry: null, label: null, rowspan: 1 }
-                ]
+                data: [ { action: { icon: null, text: null, special: 'trips.realtimeUpdate' }, colspan: 4, rowspan: 1 } ]
             });
 
             const createRoute = {
@@ -2265,6 +2278,9 @@
 
         data() {
             return {
+                /** @type {!Number} */
+                mainKey: 0,
+
                 /** @type {?Entry} */
                 childEntry: null,
 
@@ -2297,9 +2313,6 @@
             };
         },
         mounted() {
-            $("#open-button-st").click(() => $("#open-input-st").click());
-            $("#open-button-rt").click(() => $("#open-input-rt").click());
-
             if (process.env.NODE_ENV === 'production') {
                 this.dataset = new Dataset(new DOMParser().parseFromString(getXML(), 'text/xml'));
                 this.realtime = new Realtime(this.dataset);
@@ -2325,11 +2338,17 @@
         },
 
         methods: {
+            __loadDataset() {
+                document.getElementById("open-input-st").click();
+            },
+            __loadRealtime() {
+                document.getElementById("open-input-rt").click();
+            },
+
             createDataset() {
                 this.texterWrapper = {
                     callback: filename => {
-                        this.table = null;
-                        this.divers = null;
+                        this.resetDisplay();
                         this.realtime.reset();
                         this.dataset.reset(filename);
                     },
@@ -2343,17 +2362,16 @@
              * @param {!Object} event
              */
             loadDataset(event) {
-                this.table = null;
-                this.divers = null;
+                this.resetDisplay();
                 this.realtime.reset();
                 this.dataset.load(event);
-            },
+            },     
 
             /**
              * @param {!String} fileIdentifier
              */
             createTable(fileIdentifier) {
-                this.divers = null;
+                this.resetDisplay();
                 const station = this.dataset.get('stops').get('location_type').types[0].enumeration.toHTML('1');
                 const stop = this.dataset.get('stops').get('location_type').types[0].enumeration.toHTML('0');
                 switch(fileIdentifier) {
@@ -2389,7 +2407,6 @@
                 const station = this.dataset.get('stops').get('location_type').types[0].enumeration.toHTML('1');
                 this.texterWrapper = {
                     callback: stopID => {
-                        this.divers = null;
                         this.selectStation(this.dataset.get('stops').createRecord([
                             { property: 'stop_id', value: stopID },
                             { property: 'location_type', value: station }
@@ -2401,7 +2418,6 @@
             createTrip() {
                 this.texterWrapper = {
                     callback: tripID => {
-                        this.divers = null;
                         this.selectTrip(this.dataset.get('trips').createRecord([ { property: 'trip_id', value: tripID } ]))
                     },
                     title: 'Trip ID'
@@ -2412,14 +2428,14 @@
              * @param {!Record} station
              */
             selectStation(station) {
-                this.table = null;
+                this.resetDisplay();
                 this.divers = station.__file.identifier === 'stops' ? new Station(station, this) : null;
             },
             /**
              * @param {!Record} trip
              */
             selectTrip(trip) {
-                this.table = null;
+                this.resetDisplay();
                 this.divers = trip.__file.identifier === 'trips' ? new Trip(trip, this) : null;
             },
             /**
@@ -2469,6 +2485,12 @@
                     });
                 }  
                 return trees;
+            },
+
+            resetDisplay() {
+                this.table = null;
+                this.divers = null;
+                this.mainKey += 1;
             }
         }
     }

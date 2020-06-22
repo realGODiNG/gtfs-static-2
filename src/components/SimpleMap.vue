@@ -1,6 +1,6 @@
 <template>
     <fragment>
-        <div id="simple-map" :key="mainKey" />
+        <div id="simple-map" />
         <div v-for="(record, index) in data" :key="'marker-' + index" :id="'marker-' + index">
             <b-icon icon="geo-alt" :variant="getVariant(index)"
                 :class="(isSelected(record) ? 'h2' : 'h4') + ' mb-2'"
@@ -27,9 +27,6 @@
 
         data() {
             return {
-                /** @type {!Number} */
-                mainKey: 0,
-
                 /** @type {!Object} */
                 map: null,
 
@@ -205,9 +202,8 @@
                 this.data[index]['stop_lat'].set(position.lat.toString());
                 this.data[index]['stop_lon'].set(position.lon.toString());
                 if (this.markers[index] !== null) {
-                    this.markers[index].setLngLat([ position.lon, position.lat ]).update();
+                    this.markers[index].setLngLat([ position.lon, position.lat ]);
                 }
-                this.mainKey += 1;
                 return true;
             }
         }
