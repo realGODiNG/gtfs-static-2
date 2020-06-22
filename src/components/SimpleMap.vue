@@ -61,7 +61,7 @@
                     "customAttribution": '<a href="https://www.openstreetmap.org/">© OpenStreetMap contributors</a>'
                 },
                 center: [ center.lon, center.lat ],
-                zoom: 16
+                zoom: this.data[0]['stop_lat'].isEmpty() || this.data[0]['stop_lon'].isEmpty() ? 4 : 16
             });
             this.markers.length = 0;
             for (var index = 0; index < this.data.length; index++) {
@@ -96,8 +96,7 @@
              */
             isShown(index) {
                 const stop = this.data[index];
-                return stop !== undefined && !stop['stop_lat'].isEmpty() && !stop['stop_lon'].isEmpty()
-                    && this.getProperty(index, 'location_type', true) !== '4';
+                return stop !== undefined && !stop['stop_lat'].isEmpty() && !stop['stop_lon'].isEmpty();
             },
 
             /**
@@ -169,7 +168,7 @@
                 const stop = this.data[index];
                 return stop !== undefined && !stop['stop_lat'].isEmpty() && !stop['stop_lon'].isEmpty()
                     ? { lat: parseFloat(stop['stop_lat'].get()), lon: parseFloat(stop['stop_lon'].get()) }
-                    : { lat: 0, lon: 0 };
+                    : { lat: 50.6418783, lon: 10.3618556 };
             },
             /**
              * @param {!Number} index
@@ -185,6 +184,8 @@
                         return 'success ';
                     case '3':
                         return 'warning';
+                    case '4':
+                        return 'light';
                     default:
                         return 'dark';  
                 }

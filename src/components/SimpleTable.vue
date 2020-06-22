@@ -9,7 +9,9 @@
             <template v-slot:cell()="data">
                 <span class="centered" v-if="data.value.record === undefined">
                     <fragment v-if="data.item.__isShadow">
-                        <b-icon class="m-1" icon="plus" @click="__addShadow(data.item.__file)" />
+                        <b-icon class="m-1" icon="plus" @click="__addShadow(data.item.__file)"
+                            v-if="isFilled(data.item)"
+                        />
                     </fragment>
                     <fragment v-else-if="move !== null">
                         <b-icon class="m-1" icon="arrow-up" @click="move(data.index, 'up')" />
@@ -159,6 +161,21 @@
                         break;
                 }
             },
+
+            /**
+             * @param {!Record} record
+             * @returns {!Boolean}
+             */
+            isFilled(record) {
+                switch (record.__file.identifier) {
+                    case 'transfers':
+                        // fallsthrough
+                    case 'pathways':
+                        return !record['from_stop_id'].isEmpty() || !record['to_stop_id'].isEmpty();
+                    default:
+                        return true;
+                }
+            }
         }
     };
 </script>
