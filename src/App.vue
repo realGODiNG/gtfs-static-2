@@ -61,7 +61,9 @@
                     </b-nav-item>
                 </b-navbar-nav>
                 <b-nav-form class="ml-auto" v-if="table !== null">
-                    <b-form-input class="m-1" v-model="table.filterWrapper" placeholder="Filter" size="sm" />
+                    <form @submit.prevent>
+                        <b-form-input class="m-1" v-model="table.filterWrapper" placeholder="Filter" size="sm" @keyup.enter="table.applyFilter()" />
+                    </form>
                     <b-icon class="m-1" icon="trash" @click="table.applyFilter(true)" :variant="table.filter.length != 0 ? 'light' : 'dark'" />
                     <b-icon class="m-1" icon="search" @click="table.applyFilter()" variant="light" />
                 </b-nav-form>
@@ -188,6 +190,7 @@
                                         :rows="$screens({ default: 1, lg: 1 })"
                                         v-model="pickerDate"
                                         is-expanded is-inline
+                                        :select-attribute="{ dot: true }"
                                     />
                                 </span>
                                 <span :key="divers.stopsKey" v-else-if="element.action.special === 'trips.stop_times'">
@@ -208,14 +211,16 @@
                                     />
                                 </span>
                                 <fragment v-else-if="element.action.special === 'stops.map'">
-                                    <div id="map" :key="divers.mapKey">
+                                    <div id="map">
                                         <SimpleMap
                                             :data="divers.tree.flat()"
                                             :isSelected="divers.mapIsSelect"
                                             :refreshParent="divers.stationRefresh"
                                             :select="divers.mapSelect"
-                                        />
-                                        
+                                            :first="divers.mapsFirst"
+                                            @moved="divers.mapsFirst = $event"
+                                            v-if="!divers.mapNeedsRefresh"
+                                        />  
                                     </div>
                                     <div class="centered">
                                         Use "ctrl + right-click" to set position.
@@ -409,17 +414,54 @@
      * @returns {!Array.<!String>}
      */
     function gtfsLineSplit(line) {
-        const split = line.split('\r').join('').split('\t').join('').split('""').join('\r').split(",");
-        var index = 0;
-        while (index < split.length - 1) {
-            if ((split[index].match(/"/g) || []).length == 1) {
-                split[index] += ';' + split.splice(index + 1, 1);
-            } else {
-                index += 1;
+        line = line.split('\r').join('').split('\t').join('');
+        const result = new Array();
+        result.push('');
+        var stateOfQuotes = false;
+        for (var index = 0; index < line.length; ++index) {
+            const c = line.charAt(index);
+            switch (c) {
+                case '"':
+                    stateOfQuotes = !stateOfQuotes;
+                    if (!stateOfQuotes && line.charAt(index + 1) !== ',') {
+                        result[result.length - 1] += '"';
+                    }
+                    break;
+                case ',':
+                    if (!stateOfQuotes) {
+                        result.push('');
+                    } else {
+                        result[result.length - 1] += ',';
+                    }
+                    break;
+                default:
+                    result[result.length - 1] += c;
+                    break;
             }
         }
-        split.forEach((value, index) => split[index] = value.split('"').join('').split('\r').join('"').trim());
-        return split;
+        return result;
+    }
+    /**
+     * @param {!String} value
+     * @returns {!String}
+     */
+    function gtfsEntrySave(value) {
+        if (value.indexOf('"') == -1 && value.indexOf(',') == -1) {
+            return value;
+        }
+        var result = '"';
+        for (var index = 0; index < value.length; ++index) {
+            const c = value.charAt(index);
+            switch (c) {
+            case '"':
+                result += '""';
+                break;
+            default:
+                result += c;
+                break;
+            }
+        }
+        return result + '"';
     }
     /**
      * @param {!Record} record
@@ -972,7 +1014,7 @@
                     const value = entry.isEnumeration()
                         ? entry.fieldType.enumeration.fromHTML(entry.get())
                         : entry.fieldType.structure.fromHTML(entry.get());
-                    return str + value + ',';
+                    return str + gtfsEntrySave(value) + ',';
                 }, '');
                 result += '\n' + line.slice(0, -1);
             });
@@ -1683,8 +1725,11 @@
                 this.key += 1;
             }
 
-            /** @type {!Number} */
-            this.mapKey = 2000;
+            /** @type {?Object} */
+            this.mapsFirst = null;
+
+            /** @type {!Boolean} */
+            this.mapNeedsRefresh = false;
 
             /** @type {!Function} */
             this.mapIsSelect = stop => this.currentStop.__isEqual(stop);
@@ -1815,16 +1860,20 @@
                     }
                     // fallsthrough
                 case 'tree':
+                    this.mapNeedsRefresh = true;
                     this.tree = null;
                     this.stationKey += 1;
                     this.tree = gtfsStopTree(this.record, false, true);
-                    this.tree.select(this.currentStop['stop_id'].get());
+                    this.tree.select(this.currentStop['stop_id'].get()); 
                     if (updateKey !== 'full') {
                         break;
                     }
                     // fallsthrough
                 default:
                     break;
+            }
+            if (this.mapNeedsRefresh) {
+                this.vue.$nextTick(() => this.mapNeedsRefresh = false);
             }
         }
 
@@ -1851,7 +1900,8 @@
                     case 'stops.stop_lat':
                         // fallsthrough
                     case 'stops.stop_lon':
-                        this.mapKey += 1;
+                        this.mapNeedsRefresh = true;
+                        this.vue.$nextTick(() => this.mapNeedsRefresh = false);
                         break;
                     default:
                         break;
@@ -2124,12 +2174,15 @@
                 case 'full-calendar':
                     if (service instanceof Record && (!isCalendar || (!startDate.isEmpty() && !endDate.isEmpty()))) {
                         if (serviceDaysTable.find(row => row.key === 'service-days-row-3') === undefined) {
+                            this.vue.pickerDate = null;
+                            this.vue.lastDate = null;
                             serviceDaysTable.push({
                                 key: 'service-days-row-3',
                                 data: [
                                     { action: { icon: null, text: null, special: 'trips.calendar' }, colspan: 9, rowspan: 1 }
                                 ]
                             });
+                            
                         }
                         this.calendar.find(element => element.key === 'range').dates = !isCalendar ? null : {
                             start: gtfsDate(startDate),
@@ -2176,12 +2229,12 @@
             }
         }
 
-        handleDate() {
+        handleDate(value) {
             if (this.mockups.find(mockup => mockup.title === 'Service Days').table.find(row => row.key === 'service-days-row-3')) {
                 const isCalendar = this.record['service_id'].fieldType.name === this.record['service_id'].field.types[0].name;
                 const calenderDates = this.dataset.get('calendar_dates');
                 const serviceID = this.record['service_id'].get();
-                const pickedData = gtfsDate(this.vue.pickerDate);
+                const pickedData = gtfsDate(value);
                 const record = calenderDates.records.find(record => record['service_id'].get() === serviceID && record['date'].get() === pickedData);
                 if (record instanceof Record) {
                     if (isCalendar || this.calendar.find(element => element.key === 'added').dates.length != 1) {
@@ -2193,9 +2246,9 @@
                     
                 } else if (isCalendar) {
                     const range = this.calendar.find(element => element.key === 'range').dates;
-                    const pickedDay = this.vue.pickerDate.getDay() + 1;
-                    const inRange = range.start <= this.vue.pickerDate
-                        && this.vue.pickerDate <= range.end
+                    const pickedDay = value.getDay() + 1;
+                    const inRange = range.start <= value
+                        && value <= range.end
                         && range.weekdays.find(day => day == pickedDay) !== undefined;
                     calenderDates.createRecord([
                         { property: 'service_id', value: serviceID },
@@ -2217,9 +2270,7 @@
                         service_id.set(serviceID);
                     }
                 }
-                this.vue.pickerDate = null;
                 this.update('calendar');
-                this.calendarKey += 1;
             }
         }
         /**
@@ -2309,7 +2360,10 @@
                 divers: null,
 
                 /** @type {?Date} */
-                pickerDate: null
+                pickerDate: null,
+
+                /** @type {?Date} */
+                lastDate: null
             };
         },
         mounted() {
@@ -2331,8 +2385,11 @@
 
         watch: {
             pickerDate(value) {
-                if (value instanceof Date && this.divers instanceof Trip) {
-                    this.divers.handleDate(value);
+                if (this.divers instanceof Trip) {
+                    if (value instanceof Date || this.lastDate instanceof Date) {
+                        this.divers.handleDate(value instanceof Date ? value : this.lastDate);
+                    }
+                    this.lastDate = value;
                 }
             }
         },

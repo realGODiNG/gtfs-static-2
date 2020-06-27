@@ -60,8 +60,8 @@
                     } ],
                     "customAttribution": '<a href="https://www.openstreetmap.org/">© OpenStreetMap contributors</a>'
                 },
-                center: [ center.lon, center.lat ],
-                zoom: this.data[0]['stop_lat'].isEmpty() || this.data[0]['stop_lon'].isEmpty() ? 4 : 16
+                center: this.first !== null ? [ this.first.lon, this.first.lat ] : [ center.lon, center.lat ],
+                zoom: this.first !== null ? this.first.zoom : this.data[0]['stop_lat'].isEmpty() || this.data[0]['stop_lon'].isEmpty() ? 4 : 16
             });
             this.markers.length = 0;
             for (var index = 0; index < this.data.length; index++) {
@@ -81,15 +81,21 @@
                     this.setPosition(index, { lat: event.lngLat.lat, lon: event.lngLat.lng })
                 }
             });
+            this.map.on('move', () => this.$emit('moved', {
+                lat: this.map.transform._center.lat,
+                lon: this.map.transform._center.lng,
+                zoom: this.map.transform._zoom 
+            }));
         },
         props: {
             'data': Array,
             'isSelected': Function,
             'refreshParent': Function,
-            'select': Function
+            'select': Function,
+            'first': Object
         },
 
-        methods: {  
+        methods: {
             /**
              * @param {!Number} index
              * @returns {!Boolean}

@@ -9,7 +9,9 @@
                         </b-navbar-brand>
                         <b-navbar-nav class="ml-auto">
                             <b-nav-form>
-                                <b-form-input class="m-1" v-model="filterWrapper" placeholder="Filter" size="sm" />
+                                <form @submit.prevent>
+                                    <b-form-input class="m-1" v-model="filterWrapper" placeholder="Filter" size="sm" @keyup.enter="applyFilter()" />
+                                </form>
                                 <b-icon class="m-1" icon="trash" @click="applyFilter(true)" :variant="filter.length != 0 ? 'light' : 'dark'" />
                                 <b-icon class="m-1" icon="search" @click="applyFilter()" variant="light" />
                             </b-nav-form>
