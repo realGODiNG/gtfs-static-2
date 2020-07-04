@@ -1,7 +1,7 @@
 <template>
     <div id="app" :key="mainKey">
         <input id="open-input-st" type="file" @change="loadDataset($event)" />
-        <input id="open-input-rt" type="file" @change="realtime.load($event)" />
+        <input id="open-input-rt" type="file" @change="loadRealtime($event)" />
         <b-navbar id="main-menu" toggleable="lg" type="dark" variant="dark">
             <b-navbar-brand>GTFS Static</b-navbar-brand>
             <b-navbar-toggle target="main-menu-collapse"></b-navbar-toggle>
@@ -17,6 +17,9 @@
                         <b-dropdown-item @click="dataset.save()">
                             Save
                         </b-dropdown-item>
+                        <b-dropdown-item @click="editDatasetFilename()">
+                            Edit 'Filename' ...
+                        </b-dropdown-item>
                     </b-nav-item-dropdown>
                     <b-nav-item-dropdown text="Realtime">
                         <b-dropdown-item @click="createRealtime()">
@@ -27,6 +30,12 @@
                         </b-dropdown-item>
                         <b-dropdown-item @click="realtime.save()">
                             Save
+                        </b-dropdown-item>
+                        <b-dropdown-item @click="editRealtimeFilename()">
+                            Edit 'Filename' ...
+                        </b-dropdown-item>
+                        <b-dropdown-item @click="timestamp = realtime.feed.header.timestamp">
+                            Edit 'Timestamp' ...
                         </b-dropdown-item>
                     </b-nav-item-dropdown>
                     <b-nav-item-dropdown text="Station">
@@ -45,6 +54,14 @@
                             Select ...
                         </b-dropdown-item>
                     </b-nav-item-dropdown>
+                    <b-nav-item-dropdown text="Update">
+                        <b-dropdown-item @click="createTripUpdate()">
+                            Add new trip ...
+                        </b-dropdown-item>
+                        <b-dropdown-item @click="createTable('__tripUpdates')">
+                            Overview all ...
+                        </b-dropdown-item>
+                    </b-nav-item-dropdown>
                     <b-nav-item-dropdown text="File" v-if="dataset !== null">
                         <b-dropdown-item v-for="file in dataset.files" :key="file.identifier"
                             v-b-tooltip.hover="{ placement: 'right', title: file.description }"
@@ -60,20 +77,23 @@
                         Add Record
                     </b-nav-item>
                 </b-navbar-nav>
-                <b-nav-form class="ml-auto" v-if="table !== null">
+                <b-nav-form class="ml-auto" v-if="diversTable !== null">
                     <form @submit.prevent>
-                        <b-form-input class="m-1" v-model="table.filterWrapper" placeholder="Filter" size="sm" @keyup.enter="table.applyFilter()" />
+                        <b-form-input class="m-1" v-model="diversTable.filterWrapper" placeholder="Filter" size="sm" @keyup.enter="diversTable.applyFilter()" />
                     </form>
-                    <b-icon class="m-1" icon="trash" @click="table.applyFilter(true)" :variant="table.filter.length != 0 ? 'light' : 'dark'" />
-                    <b-icon class="m-1" icon="search" @click="table.applyFilter()" variant="light" />
+                    <b-icon class="m-1" icon="trash" @click="diversTable.applyFilter(true)" :variant="diversTable.filter.length != 0 ? 'light' : 'dark'" />
+                    <b-icon class="m-1" icon="search" @click="diversTable.applyFilter()" variant="light" />
                 </b-nav-form>
                 <b-navbar-nav class="ml-auto">
                     <b-nav-item id="dataset-filename" disabled v-if="dataset !== null">
-                        <span v-if="table === null">
+                        <span v-if="diversTable === null">
                             Dataset: '{{ dataset.filename }}' - Realtime: '{{ realtime.filename }}'
                         </span>
-                        <span v-else>
+                        <span v-else-if="table !== null">
                             File: '{{ table.file.name }}'
+                        </span>
+                        <span v-else>
+                            Trip Updates
                         </span>
                     </b-nav-item>
                 </b-navbar-nav>
@@ -151,6 +171,37 @@
                 align="center"
             />
         </div>
+        <div :key="realtimeTable.key" v-if="realtimeTable !== null">
+            <b-table id="realtime-table"
+                :current-page="realtimeTable.currentPage"
+                :fields="realtimeTable.getFields()"
+                :items="realtimeTable.getTripUpdates()"
+                :per-page="realtimeTable.perPage"
+                fixed hover small striped
+            >
+                <template v-slot:cell()="data">
+                    <b-form-input :value="data.value" size="sm" disabled />
+                </template>
+                <template v-slot:cell(__actions)="data">
+                    <span class="centered">
+                        <b-icon class="m-1" icon="pen"
+                            v-b-tooltip.hover="{ placement: 'top', title: 'Edit trip update.' }"
+                            @click="realtimeTable.editTripUpdate(data.item['id'])"
+                        />
+                        <b-icon class="m-1" icon="trash"
+                            v-b-tooltip.hover="{ placement: 'top', title: 'Delete trip update.' }"
+                            @click="realtimeTable.deleteTripUpdate(data.item['id'])"
+                        />
+                    </span>
+                </template>
+            </b-table>
+            <b-pagination aria-controls="realtime-table"
+                v-model="realtimeTable.currentPage"
+                :per-page="realtimeTable.perPage"
+                :total-rows="realtimeTable.getTripUpdates().length"
+                align="center"
+            />
+        </div>
         <div :key="divers.key" v-if="divers !== null">
             <b-card v-for="mockup in divers.mockups" :key="mockup.title" :title="mockup.title">
                 <b-table-simple fixed small>
@@ -177,7 +228,7 @@
                                 </b-button>
                                 <fragment :key="divers.calendarKey" v-else-if="element.action.special === 'trips.realtimeUpdate'">
                                     <b-button
-                                        @click="currentTrip = divers.record"
+                                        @click="createTripUpdate(divers.record)"
                                         size="sm" type="button" variant="dark"
                                         :disabled="divers.record['trip_id'].isEmpty() || divers.record['service_id'].isEmpty()"
                                     >
@@ -306,7 +357,12 @@
             @close="childStopEntry = null; divers.update($event ? 'full' : ''); divers.key += $event"
             v-if="divers !== null && childStopEntry !== null"
         />
-        <SimpleTripUpdate :realtime="realtime" :trip="currentTrip" @close="currentTrip = null" v-if="currentTrip !== null" />
+        <SimpleTripUpdate :realtime="realtime" :tripUpdate="currentTripUpdate"
+            :gtfsStopTrees="gtfsStopTrees"
+            @close="currentTripUpdate = null"
+            v-if="currentTripUpdate !== null"
+        />
+        <Timestamp :converter="__convertTimestamp" :timestamp="timestamp" @close="closeTimestamp($event)" v-if="timestamp !== null" />
         <Texter :wrapper="texterWrapper" @close="texterWrapper = null" v-if="texterWrapper !== null" />
     </div>
 </template>
@@ -319,6 +375,7 @@
     import SimpleTable from './components/SimpleTable.vue'
     import SimpleTree from './components/SimpleTree.vue'
     import SimpleTripUpdate from './components/SimpleTripUpdate.vue'
+    import Timestamp from './components/Timestamp.vue'
     import Texter from './components/Texter.vue'
 
     import JSZip from 'jszip'
@@ -535,6 +592,35 @@
     }
 
     /**
+     * @param {!Array.<!String>|!Number|undefined}
+     * @returns {!Number|!Array.<!String>|undefined}
+     */
+    function convertTimestamp(original) {
+        if (original instanceof Array) {
+            if (original[0].length * original[1].length == 0) {
+                return undefined;
+            }
+            const year = original[0].substr(0, 4);
+            const month = (Number.parseInt(original[0].substr(5, 2), 10) - 1).toString();
+            const day = original[0].substr(8, 2);
+            const time = original[1].split(':');
+            return new Date(year, month, day, time[0], time[1], time[2]).getTime() / 1000;
+        } else {
+            if (original === undefined) {
+                return [ '', '' ];
+            }
+            const date = new Date(original * 1000);
+            const year = date.getFullYear().toString();
+            const month = '0' + (date.getMonth() + 1);
+            const day = '0' + date.getDate();
+            const hours = '0' + date.getHours();
+            const minutes = '0' + date.getMinutes();
+            const seconds = '0' + date.getSeconds();
+            return [ year + '-' + month.substr(-2) + '-' + day.substr(-2), hours.substr(-2) + ':' + minutes.substr(-2) + ':' + seconds.substr(-2) ];
+        }
+    }
+
+    /**
      * @param {!String} text
      * @returns {!String}
      */
@@ -637,6 +723,15 @@
                 console.log(reason);
             });
         }
+
+        /**
+         * @param {!String} fileIdentifier
+         * @returns {?Record}
+         */
+        createShadow(fileIdentifier) {
+            const file = this.files.find(file => file.identifier === fileIdentifier);
+            return file instanceof File ? new Record(file, true) : null;
+        }
     }
 
     class Realtime {
@@ -646,6 +741,9 @@
         constructor(dataset) {
             var gtfsRealtimeBindings = require('gtfs-realtime-bindings');
 
+            /** @type {!Dataset} */
+            this.dataset = dataset;
+
             /** @type {!String} */
             this.filename = 'untitled';
 
@@ -653,8 +751,11 @@
             this.feed = gtfsRealtimeBindings.transit_realtime.FeedMessage.create();
             this.feed['header'] = { gtfsRealtimeVersion: "2.0", incrementality: 0, timestamp: Math.floor(new Date().getTime() / 1000) };
 
-            /** @type {!File} */
-            this.frequencies = dataset.get('frequencies');
+            /** @type {!Array.<!String>} */
+            this.scheduleRelationships = [ 'SCHEDULED', 'ADDED', 'UNSCHEDULED', 'CANCELED' ];
+
+            /** @type {!Array.<!String>} */
+            this.innerScheduleRelationships = [ 'SCHEDULED', 'SKIPPED', 'NO_DATA' ];
         }
 
         /**
@@ -666,7 +767,7 @@
                 return false;
             }
             const trip_id = record['trip_id'].get();
-            return this.frequencies.records.find(record => record['trip_id'].get() === trip_id) !== undefined;
+            return this.dataset.get('frequencies').records.find(record => record['trip_id'].get() === trip_id) !== undefined;
         }
         /**
          * @param {!Record} record
@@ -683,44 +784,101 @@
         }
 
         /**
-         * @param {!Record} record
-         * @param {!String} date
-         * @param {!String} time
-         * @param {!Number} schedule
-         * @param {!Array.<!Object>} stopTimeUpdates
+         * @returns {!Array.<!String>}
          */
-        addTripUpdate(record, date, time, schedule, stopTimeUpdates) {
-            this.feed.entity.push(new Object());
-            var entity = this.feed.entity[this.feed.entity.length - 1];
+        getTripDescriptors() {
+            return [ 'tripId', 'routeId', 'directionId', 'startTime', 'startDate', 'scheduleRelationship' ];
+        }
 
-            entity['id'] = (this.feed.entity.length - 1).toString();
+        /**
+         * @param {!TripUpdate} tripUpdate
+         */
+        addTripUpdate(__tripUpdate) {
+            var index;
+            if (__tripUpdate.entity === undefined) {
+                this.feed.entity.push(new Object());
+                index = this.feed.entity.length - 1;
+            } else {
+                const id = __tripUpdate.entity['id'];
+                index = this.feed.entity.findIndex(entity => entity['id'] === id);
+                this.feed.entity[index] = new Object();
+            }
+
+            const entity = this.feed.entity[index];
+            entity['id'] = __tripUpdate['id'];
 
             entity['tripUpdate'] = new Object();
             var tripUpdate = entity['tripUpdate'];
 
             tripUpdate['trip'] = new Object();
             var trip = tripUpdate['trip'];
-            trip['tripId'] = record['trip_id'].get();
-            if (!record['route_id'].isEmpty()) {
-                trip['route_id'] = record['route_id'].get();
+            trip['tripId'] = __tripUpdate.tripUpdate.trip['tripId'];
+            if (__tripUpdate.tripUpdate.trip['routeId'].length != 0) {
+                trip['routeId'] = __tripUpdate.tripUpdate.trip['routeId'];
             }
-            if (!record['direction_id'].isEmpty()) {
-                trip['direction_id'] = Number.parseInt(record['direction_id'].fieldType.enumeration.fromHTML(record['direction_id'].get()), 10);
+            if (__tripUpdate.tripUpdate.trip['directionId'].length != 0) {
+                trip['directionId'] = Number.parseInt(this.dataset.get('trips').get('direction_id').types[0].enumeration.fromHTML(__tripUpdate.tripUpdate.trip['directionId']), 10);
             }
-            if (time.length != 0) {
-                trip['startTime'] = time;
+            if (__tripUpdate.tripUpdate.trip['startTime'].length != 0) {
+                trip['startTime'] = __tripUpdate.tripUpdate.trip['startTime'];
             }
-            if (date.length != 0) {
-                trip['startDate'] = date.split('-').join('');
+            trip['startDate'] = __tripUpdate.tripUpdate.trip['startDate'].split('-').join('');
+            if (__tripUpdate.tripUpdate.trip['scheduleRelationship'].length != 0) {
+                trip['scheduleRelationship'] = this.scheduleRelationships.findIndex(e => e === __tripUpdate.tripUpdate.trip['scheduleRelationship']);
             }
-            if (schedule.length != 0) {
-                trip['scheduleRelationship'] = schedule;
+            if (__tripUpdate.tripUpdate.timestamp[0].length * __tripUpdate.tripUpdate.timestamp[1].length != 0) {
+                tripUpdate['timestamp'] = convertTimestamp(__tripUpdate.tripUpdate.timestamp);
+            }
+            var regex = __tripUpdate.tripUpdate.delay.match('[-]?\\d*');
+            if ((__tripUpdate.tripUpdate.delay.length != 0 && regex !== null && regex[0] === __tripUpdate.tripUpdate.delay)
+                && __tripUpdate.tripUpdate.trip.scheduleRelationship !== 'ADDED'
+                && __tripUpdate.tripUpdate.trip.scheduleRelationship !== 'CANCELED'
+            ) {
+                tripUpdate['delay'] = Number.parseInt(__tripUpdate.tripUpdate.delay, 10);
             }
 
-            if (stopTimeUpdates.length != 0) {
-                tripUpdate['stopTimeUpdate'] = stopTimeUpdates;
+            tripUpdate['stopTimeUpdate'] = new Array();
+            if (__tripUpdate.tripUpdate.trip.scheduleRelationship !== 'CANCELED') {
+                var stopTimeUpdate = tripUpdate['stopTimeUpdate'];
+                __tripUpdate.tripUpdate.stopTimeUpdate.sort((a, b) => {
+                    return Number.parseInt(a['stopSequence'], 10) - Number.parseInt(b['stopSequence'], 10);
+                });
+                __tripUpdate.tripUpdate.stopTimeUpdate.forEach(__stopTimeUpdate => {
+                    if (__stopTimeUpdate['scheduleRelationship'] === 'NO_DATA') {
+                        __stopTimeUpdate['arrivalTime'] = '';
+                        __stopTimeUpdate['departureTime'] = '';
+                    }
+                    regex = __stopTimeUpdate['stopSequence'].match('\\d*');
+                    const arrivalRegex = __stopTimeUpdate['arrivalTime'].match('[0-3]?\\d:[0-5]\\d:[0-5]\\d|4[0-7]:[0-5]\\d:[0-5]\\d');
+                    const departureRegex = __stopTimeUpdate['departureTime'].match('[0-3]?\\d:[0-5]\\d:[0-5]\\d|4[0-7]:[0-5]\\d:[0-5]\\d');
+                    if (__stopTimeUpdate['scheduleRelationship'].length != 0
+                        || (__stopTimeUpdate['stopSequence'].length != 0 && regex !== null && regex[0] === __stopTimeUpdate['stopSequence'])
+                        || __stopTimeUpdate['stopId'].length != 0
+                        || (__stopTimeUpdate['arrivalTime'].length != 0 && arrivalRegex !== null && arrivalRegex[0] === __stopTimeUpdate['arrivalTime'])
+                        || (__stopTimeUpdate['departureTime'].length != 0 && departureRegex !== null && departureRegex[0] === __stopTimeUpdate['departureTime'])
+                    ) {
+                        stopTimeUpdate.push(new Object());
+                        var e = stopTimeUpdate[stopTimeUpdate.length - 1];
+                        if (__stopTimeUpdate['stopSequence'].length != 0 && regex !== null && regex[0] === __stopTimeUpdate['stopSequence']) {
+                            e['stopSequence'] = Number.parseInt(__stopTimeUpdate['stopSequence'], 10);
+                        }
+                        if (__stopTimeUpdate['stopId'].length != 0) {
+                            e['stopId'] = __stopTimeUpdate['stopId'];
+                        }
+                        if (__stopTimeUpdate['arrivalTime'].length != 0 && arrivalRegex !== null && arrivalRegex[0] === __stopTimeUpdate['arrivalTime']) {
+                            e['arrival'] = new Object();
+                            e['arrival']['time'] = convertTimestamp([ __tripUpdate.tripUpdate.trip['startDate'], __stopTimeUpdate['arrivalTime'] ]);
+                        }
+                        if (__stopTimeUpdate['departureTime'].length != 0 && departureRegex !== null && departureRegex[0] === __stopTimeUpdate['departureTime']) {
+                            e['departure'] = new Object();
+                            e['departure']['time'] = convertTimestamp([ __tripUpdate.tripUpdate.trip['startDate'], __stopTimeUpdate['departureTime'] ]);
+                        }
+                        if (__stopTimeUpdate['scheduleRelationship'].length != 0) {
+                            e['scheduleRelationship'] = this.innerScheduleRelationships.findIndex(f => f === __stopTimeUpdate['scheduleRelationship']);
+                        }
+                    }
+                });
             }
-            tripUpdate['timestamp'] = Math.floor(new Date().getTime() / 1000);
         }
 
         /**
@@ -733,7 +891,7 @@
                 var gtfsRealtimeBindings = require('gtfs-realtime-bindings');
                 this.filename = pbFile.name.slice(0, -3);
                 this.feed = gtfsRealtimeBindings.transit_realtime.FeedMessage.decode(Buffer.from(event.target.result));
-                console.log('binary realtime feed loaded: ', this.feed);
+                // console.log('binary realtime feed loaded: ', this.feed);
             };
             reader.readAsArrayBuffer(pbFile);
         }
@@ -751,6 +909,109 @@
             var raw = gtfsRealtimeBindings.transit_realtime.FeedMessage.encode(this.feed).finish();
             var blob = new Blob([ raw ], { type: 'application/octet-stream' });
             saveAs(blob, this.filename + '.pb');
+        }
+    }
+    
+    class TripUpdate {
+        /**
+         * @param {!Realtime} realtime
+         * @param {?String} childId
+         * @param {!Boolean} existsInRealTime
+         * @param {?Record} childTrip
+         */
+        constructor(realtime, childId, existsInRealTime, childTrip) {
+            /** @type {!Object|undefined} */
+            this.entity = existsInRealTime ? realtime.feed.entity.find(entity => entity['id'] === childId) : undefined;
+
+            const tripUpdate = this.entity !== undefined ? this.entity['tripUpdate'] : undefined;
+            const trip = tripUpdate !== undefined ? tripUpdate['trip'] : undefined;
+
+            /** @type {!String} */
+            this.id = this.entity !== undefined ? this.entity['id'] : 'ID-' + Math.floor(new Date().getTime() / 1000);
+
+            /** @type {!Object} */
+            this.tripUpdate = {
+                trip: new Object(),
+                stopTimeUpdate: new Array(),
+                timestamp: convertTimestamp(tripUpdate !== undefined ? tripUpdate['timestamp'] : Math.floor(new Date().getTime() / 1000)),
+                delay: tripUpdate !== undefined && tripUpdate['delay'] !== undefined ? tripUpdate['delay'].toString() : ''
+            }
+            if (childTrip instanceof Record) {
+                Object.defineProperty(this.tripUpdate.trip, 'tripId', { enumerable: true, value: childTrip['trip_id'].get(), writable: true });
+                Object.defineProperty(this.tripUpdate.trip, 'routeId', { enumerable: true, value: childTrip['route_id'].get(), writable: true });
+                Object.defineProperty(this.tripUpdate.trip, 'directionId', { enumerable: true, value: childTrip['direction_id'].get(), writable: true });
+                Object.defineProperty(this.tripUpdate.trip, 'startTime', { enumerable: true, value: '', writable: true });
+                Object.defineProperty(this.tripUpdate.trip, 'startDate', { enumerable: true, value: '', writable: true });
+                Object.defineProperty(this.tripUpdate.trip, 'scheduleRelationship', { enumerable: true, value: 'SCHEDULED', writable: true });
+            } else if (!existsInRealTime) {
+                Object.defineProperty(this.tripUpdate.trip, 'tripId', { enumerable: true, value: childId, writable: true });
+                Object.defineProperty(this.tripUpdate.trip, 'routeId', { enumerable: true, value: '', writable: true });
+                Object.defineProperty(this.tripUpdate.trip, 'directionId', { enumerable: true, value: '', writable: true });
+                Object.defineProperty(this.tripUpdate.trip, 'startTime', { enumerable: true, value: '', writable: true });
+                Object.defineProperty(this.tripUpdate.trip, 'startDate', { enumerable: true, value: '', writable: true });
+                Object.defineProperty(this.tripUpdate.trip, 'scheduleRelationship', { enumerable: true, value: 'ADDED', writable: true });
+            } else {
+                realtime.getTripDescriptors().forEach(tripDescriptor => {
+                    const __value = trip !== undefined && trip[tripDescriptor] !== undefined ? trip[tripDescriptor].toString() : '';
+                    Object.defineProperty(this.tripUpdate.trip, tripDescriptor, { enumerable: true, value: __value, writable: true });
+                });
+                if (this.tripUpdate.trip['startDate'].length != 0) {
+                    const date = this.tripUpdate.trip['startDate'];
+                    this.tripUpdate.trip['startDate'] = date.substr(0, 4) + '-' + date.substr(4, 2)+ '-' + date.substr(6, 2);
+                }
+                if (this.tripUpdate.trip['directionId'].length != 0) {
+                    this.tripUpdate.trip['directionId'] = realtime.dataset.get('trips').get('direction_id').types[0].enumeration.toHTML(this.tripUpdate.trip['directionId']);
+                }
+                if (this.tripUpdate.trip['scheduleRelationship'].length != 0) {
+                    this.tripUpdate.trip['scheduleRelationship'] = realtime.scheduleRelationships[this.tripUpdate.trip['scheduleRelationship']];
+                }
+            }
+            if (childTrip instanceof Record && childTrip.__file.identifier === 'trips') {
+                childTrip['trip_id'].children.forEach(child => {
+                    if (child.record.__file.identifier === 'stop_times') {
+                        this.tripUpdate.stopTimeUpdate.push({
+                            stopSequence: child.record['stop_sequence'].get(),
+                            stopId: child.record['stop_id'].get(),
+                            arrivalTime: child.record['arrival_time'].get(),
+                            departureTime: child.record['departure_time'].get(),
+                            scheduleRelationship: 'SCHEDULED'
+                        });
+                    }
+                })
+            } else if (tripUpdate !== undefined && tripUpdate['stopTimeUpdate'] !== undefined) {
+                tripUpdate['stopTimeUpdate'].forEach(e => {
+                    this.tripUpdate.stopTimeUpdate.push({
+                        stopSequence: e['stopSequence'] !== undefined ? e['stopSequence'].toString() : '',
+                        stopId: e['stopId'] !== undefined ? e['stopId'] : '',
+                        arrivalTime: e['arrival'] !== undefined && e['arrival']['time'] !== undefined ? e['arrival']['time'] : '',
+                        departureTime: e['departure'] !== undefined && e['departure']['time'] !== undefined ? e['departure']['time'] : '',
+                        scheduleRelationship: e['scheduleRelationship'] !== undefined ? realtime.innerScheduleRelationships[e['scheduleRelationship']] : 'SCHEDULED'
+                    });
+                });
+                this.tripUpdate.stopTimeUpdate.forEach(e => {
+                    if (e.arrivalTime.length != 0) {
+                        const arrivalTime = convertTimestamp(e.arrivalTime);
+                        if (this.tripUpdate.trip['startDate'].length != 0 && this.tripUpdate.trip['startDate'] !== arrivalTime[0]) {
+                            const time = arrivalTime[1].split(':');
+                            time[0] = (Number.parseInt(time[0], 10) + 24).toString();
+                            arrivalTime[1] = time.join(':');
+                        }
+                        e.arrivalTime = arrivalTime[1];
+                    }
+                    if (e.departureTime.length != 0) {
+                        const departureTime = convertTimestamp(e.departureTime);
+                        if (this.tripUpdate.trip['startDate'].length != 0 && this.tripUpdate.trip['startDate'] !== departureTime[0]) {
+                            const time = departureTime[1].split(':');
+                            time[0] = (Number.parseInt(time[0], 10) + 24).toString();
+                            departureTime[1] = time.join(':');
+                        }
+                        e.departureTime = departureTime[1];
+                    }
+                });
+            }
+            this.tripUpdate.stopTimeUpdate.sort((a, b) => {
+                return Number.parseInt(a['stopSequence'], 10) - Number.parseInt(b['stopSequence'], 10);
+            });
         }
     }
 
@@ -1544,7 +1805,7 @@
             /** @type {!Dataset} */
             this.dataset = dataset;
 
-            /** @type {!Object} */
+            /** @type {?Object} */
             this.vue = vue;
 
             /** @type {?File} */
@@ -1643,6 +1904,108 @@
         formator(text) {
             const words = text.split('_').map(word => word.length != 0 ? word[0].toUpperCase() + word.slice(1) : '');
             return words.join(' ').trim();
+        }
+    }
+
+    class RealtimeTable {
+        /**
+         * @param {!Realtime} realtime
+         * @param {!Object} vue
+         */
+        constructor(realtime, vue) {
+            /** @type {!Dataset} */
+            this.realtime = realtime;
+
+            /** @type {!Object} */
+            this.vue = vue;
+
+            /** @type {!Number} */
+            this.currentPage = 1;
+
+            /** @type {!Number} */
+            this.perPage = 10;
+
+            /** @type {!Number} */
+            this.key = 0;
+
+            /** @type {!String} */
+            this.filterWrapper = '';
+
+            /** @type {!String} */
+            this.filter = '';
+        }
+
+        /**
+         * @param {!Boolean|undefined} reset
+         */
+        applyFilter(reset) {
+            if (reset !== undefined ? reset : false) {
+                this.filterWrapper = '';
+            }
+            this.filter = this.filterWrapper;
+            this.key += 1;
+        }
+
+        /**
+         * @returns {!Array.<!{ key: !String, sortable: !Boolean }>}
+         */
+        getFields() {
+            return [ { key: 'id', sortable: true }, { key: 'timestamp', sortable: true } ]
+                .concat(this.realtime.getTripDescriptors().map(tripDescriptor => { return { key: tripDescriptor, sortable: true }; }))
+                .concat([ { key: '__actions', sortable: false } ]);
+        }
+        /**
+         * @returns {!Array.<!Object>}
+         */
+        getTripUpdates() {
+            const tripDescriptors = this.realtime.getTripDescriptors();
+            const directionIdEnum = this.realtime.dataset.get('trips').get('direction_id').types[0].enumeration;
+            const tripUpdates = this.realtime.feed.entity.flatMap(entity => {
+                const tripUpdate = entity['tripUpdate'];
+                const trip = tripUpdate !== undefined ? tripUpdate['trip'] : undefined;
+                if (trip === undefined) {
+                    return [];
+                }
+                const date = trip['startDate'];
+                return {
+                    id: entity['id'] !== undefined ? entity['id'] : '',
+                    timestamp: tripUpdate['timestamp'] !== undefined ? new Date(tripUpdate['timestamp'] * 1000).toLocaleString() : '',
+                    tripId: trip['tripId'] !== undefined ? trip['tripId'] : '',
+                    routeId: trip['routeId'] !== undefined ? trip['routeId'] : '',
+                    directionId: trip['directionId'] !== undefined ? directionIdEnum.toHTML(trip['directionId'].toString()) : '',
+                    startTime: trip['startTime'] !== undefined ? trip['startTime'] : '',
+                    startDate: date !== undefined ? date.substr(6, 2) + '.' + date.substr(4, 2) + '.' + date.substr(0, 4) : '',
+                    scheduleRelationship: trip['scheduleRelationship'] !== undefined ? this.realtime.scheduleRelationships[trip['scheduleRelationship']] : ''
+                };
+            });
+            return this.filter.length != 0 ? tripUpdates.filter(tripUpdate => {
+                    if (tripUpdate['id'].includes(this.filter) || tripUpdate['timestamp'].includes(this.filter)) {
+                        return true;
+                    }
+                    for (var index = 0; index < tripDescriptors.length; index++) {
+                        if (tripUpdate[tripDescriptors[index]].includes(this.filter)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }) : tripUpdates;
+        }
+
+        /**
+         * @param {!String} id
+         */
+        deleteTripUpdate(id) {
+            const index = this.realtime.feed.entity.findIndex(entity => entity['id'] === id);
+            if (index != -1) {
+                this.realtime.feed.entity.splice(this.index, 1);
+                this.key += 1;
+            }
+        }
+        /**
+         * @param {!String} id
+         */
+        editTripUpdate(id) {
+            this.vue.currentTripUpdate = new TripUpdate(this.realtime, id, true, null);
         }
     }
 
@@ -1967,7 +2330,7 @@
                     return record['trip_id'].get() === tripID && maximum < value ? value : maximum;
                 }, 0);
                 shadow['trip_id'].set(tripID);
-                shadow['stop_sequence'].set((stop_sequence + 1).toString());
+                shadow['stop_sequence'].set((stop_sequence + 10).toString());
                 return items.sort(__sort).concat([ shadow ]);
             };
 
@@ -2324,6 +2687,7 @@
             SimpleTable,
             SimpleTree,
             SimpleTripUpdate,
+            Timestamp,
             Texter
         },
 
@@ -2341,8 +2705,8 @@
                 /** @type {?Record} */
                 currentRecord: null,
 
-                /** @type {?Record} */
-                currentTrip: null,
+                /** @type {?Object} */
+                currentTripUpdate: null,
 
                 /** @type {?{ callback: !Function, title: !String }} */
                 texterWrapper: null,
@@ -2353,8 +2717,17 @@
                 /** @type {!Realtime} */
                 realtime: null,
 
+                /** @type {?Number} */
+                timestamp: null,
+
                 /** @type {?Table} */
                 table: null,
+
+                /** @type {?RealtimeTable} */
+                realtimeTable: null,
+
+                /** @type {?Object} */
+                diversTable: null,
 
                 /** @type {?Object} */
                 divers: null,
@@ -2401,6 +2774,9 @@
             __loadRealtime() {
                 document.getElementById("open-input-rt").click();
             },
+            __convertTimestamp(x) {
+                return convertTimestamp(x);
+            },
 
             createDataset() {
                 this.texterWrapper = {
@@ -2410,10 +2786,16 @@
                         this.dataset.reset(filename);
                     },
                     title: 'Filename'
-                };  
+                };
             },
             createRealtime() {
-                this.texterWrapper = { callback: filename => this.realtime.reset(filename), title: 'Filename' };
+                this.texterWrapper = {
+                    callback: filename => {
+                        this.resetDisplay();
+                        this.realtime.reset(filename);
+                    },
+                    title: 'Filename'
+                };  
             },
             /**
              * @param {!Object} event
@@ -2422,7 +2804,14 @@
                 this.resetDisplay();
                 this.realtime.reset();
                 this.dataset.load(event);
-            },     
+            },
+            /**
+             * @param {!Object} event
+             */
+            loadRealtime(event) {
+                this.resetDisplay();
+                this.realtime.load(event);
+            },
 
             /**
              * @param {!String} fileIdentifier
@@ -2455,10 +2844,14 @@
                             record => !record['trip_id'].isEmpty()
                         );
                         break;
+                    case '__tripUpdates':
+                        this.realtimeTable = new RealtimeTable(this.realtime, this);
+                        break;
                     default:
                         this.table = new Table(this.dataset, this, fileIdentifier, null, null);
                         break;
                 }
+                this.diversTable = this.table !== null ? this.table : this.realtimeTable;
             },
             createStation() {
                 const station = this.dataset.get('stops').get('location_type').types[0].enumeration.toHTML('1');
@@ -2479,6 +2872,21 @@
                     },
                     title: 'Trip ID'
                 };
+            },
+            /**
+             * @param {!Record|undefined} trip
+             */
+            createTripUpdate(trip) {
+                if (trip instanceof Record) {
+                    this.currentTripUpdate = new TripUpdate(this.realtime, null, false, trip);
+                } else {
+                    this.texterWrapper = {
+                        callback: tripID => {
+                            this.currentTripUpdate = new TripUpdate(this.realtime, tripID, false, null);
+                        },
+                        title: 'Trip ID'
+                    };
+                }
             },
 
             /**
@@ -2545,9 +2953,41 @@
             },
 
             resetDisplay() {
+                this.diversTable = null;
                 this.table = null;
+                this.realtimeTable = null;
                 this.divers = null;
                 this.mainKey += 1;
+            },
+
+            editDatasetFilename() {
+                this.texterWrapper = {
+                    callback: filename => {
+                        this.dataset.filename = filename;
+                        this.mainKey += 1;
+                    },
+                    title: 'Filename',
+                    prevalue: this.dataset.filename
+                };
+            },
+            editRealtimeFilename() {
+                this.texterWrapper = {
+                    callback: filename => {
+                        this.realtime.filename = filename;
+                        this.mainKey += 1;
+                    },
+                    title: 'Filename',
+                    prevalue: this.realtime.filename
+                };
+            },
+            /**
+             * @param {?Number} timestamp
+             */
+            closeTimestamp(timestamp) {
+                this.timestamp = null;
+                if (timestamp !== null) {
+                    this.realtime.feed.header.timestamp = timestamp;
+                }
             }
         }
     }

@@ -1,11 +1,11 @@
 <template>
-    <div id="simple-trip-update" class="popup">
+    <div id="simple-trip-update" class="popup" :key="mainKey">
         <div id="simple-trip-update-content" class="popup-content" role="dialog">
             <header id="simple-trip-update-header">
                 <slot name="header">
                     <b-navbar toggleable="lg" type="dark" variant="dark">
                         <b-navbar-brand>
-                            Add 'Trip Update'
+                            Edit Trip Update
                         </b-navbar-brand>
                         <b-navbar-nav class="ml-auto">
                             <b-nav-form>
@@ -17,77 +17,188 @@
             </header>
             <section id="simple-trip-update-body">
                 <slot name="body">
-                    <b-card>
-                        <b-table-simple hover small striped>
+                    <b-card title="Trip">
+                        <b-table-simple fixed small>
+                            <b-tr>
+                                <b-td>
+                                    Trip ID *
+                                    <b-form-input size="sm" type="text"
+                                        :value="tripUpdate.tripUpdate.trip.tripId"
+                                        @change="setTripId($event)"
+                                    />
+                                </b-td>
+                                <b-td>
+                                    Route ID
+                                    <b-form-input size="sm" type="text"
+                                        :placeholder="getRouteDisplayText()"
+                                        :value="new String()"
+                                        @click="routeId = routeShadow['route_id'];"
+                                        :disabled="tripExists"
+                                    />
+                                </b-td>
+                                <b-td>
+                                    Direction
+                                    <b-form-select size="sm"
+                                        :value="tripUpdate.tripUpdate.trip.directionId"
+                                        @change="tripUpdate.tripUpdate.trip.directionId = $event"
+                                        :disabled="tripExists"
+                                    >
+                                        <option v-for="value in realtime.dataset.get('trips').get('direction_id').types[0].enumeration.values" :key="value">
+                                            {{ value }}
+                                        </option>
+                                    </b-form-select>
+                                </b-td>
+                            </b-tr>
+                            <b-tr>
+                                <b-td>
+                                    Start Date *
+                                    <b-form-input type="date"  size="sm"
+                                        :value="tripUpdate.tripUpdate.trip.startDate"
+                                        @change="tripUpdate.tripUpdate.trip.startDate = $event; mainKey += 1"
+                                    />
+                                </b-td>
+                                <b-td>
+                                    Start Time
+                                    <b-form-input type="time" step="1" v-model="tripUpdate.tripUpdate.trip.startTime" size="sm" />
+                                </b-td>
+                                <b-td>
+                                    Schedule Relationship
+                                    <b-form-select size="sm"
+                                        :value="tripUpdate.tripUpdate.trip.scheduleRelationship"
+                                        @change="setScheduleRelationship($event)"
+                                    >
+                                        <option v-for="value in tripExists ? [ 'SCHEDULED', 'UNSCHEDULED', 'CANCELED' ] : [ 'ADDED' ]" :key="value">
+                                            {{ value }}
+                                        </option>
+                                    </b-form-select>
+                                </b-td>
+                            </b-tr>
+                        </b-table-simple>
+                    </b-card>
+                    <b-card title="Update">
+                        <b-table-simple fixed small>
+                            <b-tr>
+                                <b-td>
+                                    Id *
+                                    <b-form-input type="text" v-model="tripUpdate.id" size="sm" />
+                                </b-td>
+                                <b-td>
+                                    Timestamp (Date)
+                                    <b-form-input type="date" v-model="tripUpdate.tripUpdate.timestamp[0]" size="sm" />
+                                </b-td>
+                                <b-td>
+                                    Timestamp (Time)
+                                    <b-form-input type="time" step="1" v-model="tripUpdate.tripUpdate.timestamp[1]" size="sm" />
+                                </b-td>
+                                <b-td>
+                                    Delay
+                                    <b-form-input type="number" step="1" v-model="tripUpdate.tripUpdate.delay" size="sm"
+                                        v-if="tripUpdate.tripUpdate.trip.scheduleRelationship !== 'ADDED' && tripUpdate.tripUpdate.trip.scheduleRelationship !== 'CANCELED'"
+                                    />  
+                                    <b-form-input type="text" size="sm" disabled v-else />
+                                </b-td>
+                            </b-tr>
+                        </b-table-simple>
+                    </b-card>
+                    <b-card title="Stops" v-if="tripUpdate.tripUpdate.trip.scheduleRelationship !== 'CANCELED'">
+                        <b-table-simple fixed hover small striped :style="{ width: '1200px' }">
                             <b-thead>
                                 <b-tr>
-                                    <b-th v-if="isFrequencyBased || isScheduleBased">
-                                        Start Date
-                                    </b-th>
-                                    <b-th v-if="isFrequencyBased">
-                                        Start Time
-                                    </b-th>
-                                    <b-th>
+                                    <b-th colspan="2">
                                         Schedule Relationship
+                                    </b-th>
+                                    <b-th colspan="1">
+                                        Stop Seq.
+                                    </b-th>
+                                    <b-th colspan="3">
+                                        Stop Id
+                                    </b-th>
+                                    <b-th colspan="2">
+                                        Arrival Time
+                                    </b-th>
+                                    <b-th colspan="2">
+                                        Depature Time
+                                    </b-th>
+                                    <b-th colspan="1">
+                                        Actions
                                     </b-th>
                                 </b-tr>
                             </b-thead>
                             <b-tbody>
+                                <b-tr v-for="(stopTimeUpdate, index) in getStopTimeUpdates()" :key="index">
+                                    <b-td colspan="2">
+                                        <b-form-select size="sm"
+                                            :value="stopTimeUpdate.scheduleRelationship"
+                                            @change="stopTimeUpdate.scheduleRelationship = $event"
+                                        >
+                                            <option v-for="value in realtime.innerScheduleRelationships" :key="value">
+                                                {{ value }}
+                                            </option>
+                                        </b-form-select>
+                                    </b-td>
+                                    <b-td colspan="1">
+                                        <b-form-input type="number" step="1" min="0" v-model="stopTimeUpdate.stopSequence" size="sm" />
+                                    </b-td>
+                                    <b-td colspan="3">
+                                        <b-form-input type="text"
+                                            :placeholder="getStopDisplayText(stopTimeUpdate)"
+                                            :value="new String()"
+                                            @click="stopId = stopShadow['stop_id']; currentStopTimeUpdate = stopTimeUpdate;"
+                                            size="sm"
+                                        />
+                                    </b-td>
+                                    <fragment v-if="stopTimeUpdate.scheduleRelationship !== 'NO_DATA'">
+                                        <b-td colspan="2">
+                                            <b-form-input size="sm" type="text" v-model="stopTimeUpdate.arrivalTime"
+                                                :pattern="'[0-3]?\\d:[0-5]\\d:[0-5]\\d|4[0-7]:[0-5]\\d:[0-5]\\d'"
+                                            />
+                                        </b-td>
+                                        <b-td colspan="2">
+                                            <b-form-input size="sm" type="text" v-model="stopTimeUpdate.departureTime"
+                                                :pattern="'[0-3]?\\d:[0-5]\\d:[0-5]\\d|4[0-7]:[0-5]\\d:[0-5]\\d'"
+                                            />
+                                        </b-td>
+                                    </fragment>
+                                    <fragment v-else>
+                                        <b-td colspan="2">
+                                            <b-form-input size="sm" type="text" disabled />
+                                        </b-td>
+                                        <b-td colspan="2">
+                                            <b-form-input size="sm" type="text" disabled />
+                                        </b-td>
+                                    </fragment>
+                                    <b-td colspan="1">
+                                        <span class="centered">
+                                            <b-icon class="m-1" icon="trash" @click="__delete(index)"
+                                                v-if="index < tripUpdate.tripUpdate.stopTimeUpdate.length"
+                                            />
+                                            <b-icon class="m-1" icon="plus" @click="__add()"
+                                                v-else
+                                            />
+                                        </span>
+                                    </b-td>
+                                </b-tr>
                                 <b-tr>
-                                    <b-td v-if="isFrequencyBased || isScheduleBased">
-                                        <b-form-input type="date" v-model="startDate" size="sm" />
-                                    </b-td>
-                                    <b-td v-if="isFrequencyBased">
-                                        <b-form-select v-model="startTime" :options="stopTimes" size="sm" />
-                                    </b-td>
-                                    <b-td>
-                                        <b-form-select v-model="schedule" :options="scheduleRelationship" size="sm" />
+                                    <b-td colspan="10" />
+                                    <b-td colspan="1">
+                                        <span class="centered">
+                                            <b-button @click="sortStopTimeUpdates()" size="sm" type="button" variant="dark">
+                                                Sort
+                                            </b-button>
+                                        </span>
                                     </b-td>
                                 </b-tr>
                             </b-tbody>
                         </b-table-simple>
-                        <fragment v-if="schedule !== null && schedule !== 'CANCELED'">
-                            <b-card v-for="(stopIdentifier, index) in stopIdentifiers" :key="index">
-                                <b-form-checkbox class="m-1" v-model="stopTimeBooleans[index.toString()]" @change="toggleStopTimeUpdate(index)">
-                                    {{ formator(stopIdentifier.property) + ': ' + stopIdentifier.value }}
-                                </b-form-checkbox>
-                                <b-table-simple hover small striped v-if="stopTimeBooleans[index.toString()]">
-                                    <b-thead>
-                                        <b-tr>
-                                            <b-th>
-                                                Schedule Relationship
-                                            </b-th>
-                                            <b-th>
-                                                Arrival Delay
-                                            </b-th>
-                                            <b-th>
-                                                Departure Delay
-                                            </b-th>
-                                        </b-tr>
-                                    </b-thead>
-                                    <b-tbody>
-                                        <b-tr>
-                                            <b-td>
-                                                <b-form-select :options="innerScheduleRelationship" v-model="stopTimeUpdates[index.toString()].schedule" size="sm" />
-                                            </b-td>
-                                            <b-td>
-                                                <b-form-input type="number" step="1" v-model="stopTimeUpdates[index.toString()].arrival_delay" size="sm" />
-                                            </b-td>
-                                            <b-td>
-                                                <b-form-input type="number" step="1" v-model="stopTimeUpdates[index.toString()].departure_delay" size="sm" />
-                                            </b-td>
-                                        </b-tr>
-                                    </b-tbody>
-                                </b-table-simple>
-                            </b-card>
-                        </fragment>
                     </b-card>
                 </slot>
             </section>
             <footer id="simple-trip-update-footer" class="centered">
                 <slot name="footer">
                     <b-card>
-                        <b-button class="m-1" type="button" @click="close(true)" variant="dark" :disabled="!isSaveable">
+                        <b-button class="m-1" type="button" @click="close(true)" variant="dark"
+                            :disabled="tripUpdate.id.length * tripUpdate.tripUpdate.trip['tripId'].length * tripUpdate.tripUpdate.trip['startDate'].length == 0"
+                        >
                             Save
                         </b-button>
                         <b-button class="m-1" type="button" @click="close(false)" variant="dark">
@@ -97,214 +208,161 @@
                 </slot>
             </footer>
         </div>
+        <SimplePicker :entry="routeId"
+            :setter="(entry, data) => tripUpdate.tripUpdate.trip['routeId'] = data !== null ? data.get() : ''"
+            @close="routeId = null"
+            v-if="routeId !== null"
+        />
+        <SimpleStop :entry="stopId"
+            :setter="(entry, data) => currentStopTimeUpdate['stopId'] = data !== null ? data.get() : ''"
+            :trees="gtfsStopTrees(stopId)"
+            @close="stopId = null; currentStopTimeUpdate = null"
+            v-if="stopId !== null && currentStopTimeUpdate !== null"
+        />
     </div>
 </template>
 
 <script>
+    import SimplePicker from './SimplePicker.vue'
+    import SimpleStop from './SimpleStop.vue'
+
     export default {
         name: 'SimpleTripUpdate',
+        components: {
+            SimplePicker,
+            SimpleStop
+        },
+
 
         data() {
             return {
-                /** @type {!String} */
-                startDate: '',
-                /** @type {!String} */
-                startTime: '',
-                /** @type {!String} */
-                schedule: '',
+                /** @type {!Number} */
+                mainKey: 0,
+
+                /** @type {!Array.<!Record>} */
+                trips: this.realtime.dataset.get('trips').records,
+
+                /** @type {!Boolean} */
+                tripExists: null,
+
+                /** @type {!Record} */
+                routeShadow: this.realtime.dataset.createShadow('trips'),
+
+                /** @type {?Entry} */
+                routeId: null,
+
+                /** @type {!Record} */
+                stopShadow: this.realtime.dataset.createShadow('stops'),
+
+                /** @type {?Entry} */
+                stopId: null,
+
+                /** @type {?Object} */
+                currentStopTimeUpdate: null,
+
                 /** @type {!Object} */
-                stopTimeBooleans: new Object(),
-                /** @type {!Object} */
-                stopTimeUpdates: new Object()
-            }
+                shadowStopTimeUpdate: { stopSequence: '', stopId: '', arrivalTime: '', departureTime: '', scheduleRelationship: 'SCHEDULED' }
+            };
+        },
+        mounted() {
+            this.setTripId(this.tripUpdate.tripUpdate.trip.tripId);
         },
         props: {
             'realtime': Object,
-            'trip': Object
+            'tripUpdate': Object,
+            'gtfsStopTrees': Function
         },
 
         methods: {
+            __add() {
+                this.tripUpdate.tripUpdate.stopTimeUpdate.push({
+                    stopSequence: this.shadowStopTimeUpdate['stopSequence'],
+                    stopId: this.shadowStopTimeUpdate['stopId'],
+                    arrivalTime: this.shadowStopTimeUpdate['arrivalTime'],
+                    departureTime: this.shadowStopTimeUpdate['departureTime'],
+                    scheduleRelationship: this.shadowStopTimeUpdate['scheduleRelationship']
+                });
+                this.shadowStopTimeUpdate = { stopSequence: '', stopId: '', arrivalTime: '', departureTime: '', scheduleRelationship: 'SCHEDULED' };
+            },
             /**
-             * @param {!String} text
-             * @returns {!String}
+             * @param {!Number} index
              */
-            formator(text) {
-                const words = text.split('_').map(word => word.length != 0 ? word[0].toUpperCase() + word.slice(1) : '');
-                return words.join(' ').trim();
+            __delete(index) {
+                if (this.tripUpdate.tripUpdate.stopTimeUpdate[index] !== undefined) {
+                    this.tripUpdate.tripUpdate.stopTimeUpdate.splice(index, 1);
+                }
             },
 
             /**
              * @param {!Boolean} decision
              */
             close(decision) {
-                if (this.schedule === 'CANCELED') {
-                    this.stopTimeBooleans = new Object();
-                    this.stopTimeUpdates = new Object();
-                }
                 if (decision) {
-                    var stopTimeUpdates = new Array();
-                    for (var index = 0; index < this.stops.length; index++) {
-                        const __stopTimeUpdate = this.stopTimeUpdates[index.toString()];
-                        if (__stopTimeUpdate !== undefined) {
-                            stopTimeUpdates.push(new Object());
-                            var stopTimeUpdate = stopTimeUpdates[stopTimeUpdates.length - 1];
-                            if (__stopTimeUpdate.identifier.property === 'stop_sequence') {
-                                stopTimeUpdate['stopSequence'] = Number.parseInt(__stopTimeUpdate.identifier.value);
-                            } else if (__stopTimeUpdate.identifier.property === 'stop_id') {
-                                stopTimeUpdate['stopId'] = __stopTimeUpdate.identifier.value;
-                            }
-                            if (__stopTimeUpdate.arrival_delay) {
-                                stopTimeUpdate['arrival'] = { delay: Number.parseInt(__stopTimeUpdate.arrival_delay) };
-                            }
-                            if (__stopTimeUpdate.departure_delay) {
-                                stopTimeUpdate['departure'] = { delay: Number.parseInt(__stopTimeUpdate.departure_delay) };
-                            }
-                            stopTimeUpdate['scheduleRelationship'] = this.innerScheduleRelationship.findIndex(schedule => {
-                                return schedule === __stopTimeUpdate.schedule;
-                            });
-                        }
-                    }
-                    this.schedule = this.scheduleRelationship.findIndex(schedule => schedule === this.schedule);
-                    this.realtime.addTripUpdate(this.trip, this.startDate, this.startTime, this.schedule, stopTimeUpdates);
+                    this.realtime.addTripUpdate(this.tripUpdate);
                 }
-                this.startDate = '';
-                this.startTime = '';
-                this.schedule = '';
-                this.stopTimeBooleans = new Object();
-                this.stopTimeUpdates = new Object();
                 this.$emit('close');
             },
 
             /**
-             * @param {!Number} index
+             * @returns {!String}
              */
-            toggleStopTimeUpdate(index) {
-                if (this.stopIdentifiers[index] !== undefined) {
-                    this.stopTimeUpdates[index.toString()] = this.stopTimeUpdates[index.toString()] === undefined
-                        ? { identifier: this.stopIdentifiers[index], arrival_delay: null, departure_delay: null, schedule: 'SCHEDULED' }
-                        : undefined;
-                }
-            }
-        },
-
-        computed: {
-            /**
-             * @returns {!Boolean}
-             */
-            isFrequencyBased() {
-                return this.realtime.isFrequencyBasedTrip(this.trip);
+            getRouteDisplayText() {
+                const routeID = this.tripUpdate.tripUpdate.trip['routeId'];
+                const route = routeID.length != 0
+                    ? this.realtime.dataset.get('routes').records.find(route => route['route_id'].get() === routeID)
+                    : undefined;
+                return route !== undefined ? route['route_id'].getDisplayText() : '';
             },
             /**
-             * @returns {!Boolean}
+             * @param {!Object} stopTimeUpdate
+             * @returns {!String}
              */
-            isScheduleBased() {
-                return this.realtime.isScheduleBasedTrip(this.trip);
+            getStopDisplayText(stopTimeUpdate) {
+                const stopID = stopTimeUpdate['stopId'];
+                const stop = stopID.length != 0
+                    ? this.realtime.dataset.get('stops').records.find(stop => stop['stop_id'].get() === stopID)
+                    : undefined;
+                return stop !== undefined ? stop['stop_id'].getDisplayText() : '';
             },
-            /**
-             * @returns {!Boolean}
-             */
-            isSaveable() {
-                return ((!this.isFrequencyBased && !this.isScheduleBased) || this.startDate.length != 0)
-                    && (!this.isFrequencyBased || this.startTime.length != 0)
-                    && this.schedule.length != 0;
-            },
-
-            /**
-             * @returns {!Array.<!Record>}
-             */
-            stops() {
-                if (this.trip.__file.identifier !== 'trips') {
-                    return new Array();
-                }
-                return this.trip['trip_id'].children.flatMap(child => {
-                    const stopID = child.record['stop_id'];
-                    const stopSequence = child.record['stop_sequence'];
-                    return child.field.file.identifier === 'stop_times' && (!stopSequence.isEmpty() || !stopID.isEmpty()) ? child.record : [];
-                });
-            },
-            /**
-             * @returns {!Array.<!{ property: !String, value: !String }>}
-             */
-            stopIdentifiers() {
-                return this.stops.map(stop => {
-                    const stopID = stop['stop_id'];
-                    const stopSequence = stop['stop_sequence'];
-                    return stopSequence.isEmpty()
-                        ? { property: 'stop_id', value: stopID.get() }
-                        : { property: 'stop_sequence', value: stopSequence.get() };
-                });
-            },
-            /**
-            * @returns {!Array.<!String>}
+            /** 
+             * @returns {!Array.<!Object>}
             */
-            stopTimes() {
-                if (this.trip.__file.identifier !== 'trips') {
-                    return new Array();
-                }
-                var times = new Array();
-                const isNotGreater = (a, b) => {
-                    var [ a0, a1, a2 ] = a.split(':');
-                    var [ b0, b1, b2 ] = b.split(':');
-                    return (Number.parseInt(a0, 10) - Number.parseInt(b0, 10)) * 3600
-                        + (Number.parseInt(a1, 10) - Number.parseInt(b1, 10)) * 60
-                        <= Number.parseInt(b2, 10) - Number.parseInt(a2, 10);
-                };
-                const addSeconds = (time, secs) => {
-                    var hours = Math.floor(secs / 3600);
-                    var minutes = Math.floor((secs - hours * 3600) / 60);
-                    var seconds = secs - minutes * 60 - hours * 3600;
-                    var [ t0, t1, t2 ] = time.split(':');
-                    seconds += Number.parseInt(t2, 10);
-                    if (seconds >= 60) {
-                        minutes++;
-                        seconds -= 60;
-                    }
-                    minutes += Number.parseInt(t1, 10);
-                    if (minutes >= 60) {
-                        hours++;
-                        minutes -= 60;
-                    }
-                    hours += Number.parseInt(t0, 10);
-                    return '' + hours + ':' + (minutes <= 9 ? '0' + minutes : minutes) + ':' + (seconds <= 9 ? '0' + seconds : seconds);
-                };
-                var iteratorTime = '99:99:99';
-                this.trip['trip_id'].children.forEach(child => {
-                    if (child.field.file.identifier === 'stop_times' && !child.record['departure_time'].isEmpty()) {
-                        const time = child.record['departure_time'].get();
-                        if (isNotGreater(time, iteratorTime)) {
-                            iteratorTime = time;
-                        }
-                    }
-                });
-                if (iteratorTime !== '99:99:99') {
-                    times.push(iteratorTime);
-                    this.trip['trip_id'].children.forEach(child => {
-                        if (child.field.file.identifier === 'frequencies' && !child.record['end_time'].isEmpty() && !child.record['headway_secs'].isEmpty()) {
-                            const endTime = child.record['end_time'].get();
-                            const headwaySeconds = Number.parseInt(child.record['headway_secs'].get(), 10);
-                            var time = addSeconds(iteratorTime, headwaySeconds);
-                            while (isNotGreater(time, endTime)) {
-                                times.push(time);
-                                time = addSeconds(time, headwaySeconds);
-                            }
-                            iteratorTime = time;
-                        }
-                    });
-                }
-                return times.sort((a, b) => isNotGreater(a, b) ? (a !== b ? -1 : 0) : 1);
+            getStopTimeUpdates() {
+                return this.tripUpdate.tripUpdate.stopTimeUpdate.concat([ this.shadowStopTimeUpdate ]);
             },
 
             /**
-             * @returns {!Array.<!String>}
+             * @param {!String} scheduleRelationship
              */
-            scheduleRelationship() {
-                return [ 'SCHEDULED', 'ADDED', 'UNSCHEDULED', 'CANCELED' ];
+            setScheduleRelationship(scheduleRelationship) {
+                if (this.tripUpdate.tripUpdate.trip.scheduleRelationship !== scheduleRelationship) {
+                    this.tripUpdate.tripUpdate.trip.scheduleRelationship = scheduleRelationship;
+                    this.mainKey += 1;
+                }
             },
             /**
-             * @returns {!Array.<!String>}
+             * @param {!String} tripID
              */
-            innerScheduleRelationship() {
-                return [ 'SCHEDULED', 'SKIPPED', 'NO_DATA' ];
+            setTripId(tripID) {
+                const trip = this.trips.find(trip => trip['trip_id'].get() === tripID);
+                this.tripExists = trip !== undefined;
+                this.tripUpdate.tripUpdate.trip.tripId = tripID;
+                if (this.tripExists) {
+                    this.tripUpdate.tripUpdate.trip.routeId = trip['route_id'].get();
+                    this.tripUpdate.tripUpdate.trip.directionId = trip['direction_id'].get();
+                    if (this.tripUpdate.tripUpdate.trip.scheduleRelationship === 'ADDED') {
+                        this.tripUpdate.tripUpdate.trip.scheduleRelationship = 'SCHEDULED';
+                    }
+                } else if (this.tripUpdate.tripUpdate.trip.scheduleRelationship !== 'ADDED') {
+                    this.tripUpdate.tripUpdate.trip.scheduleRelationship = 'ADDED';
+                }
+                this.mainKey += 1;
+            },
+
+            sortStopTimeUpdates() {
+                this.tripUpdate.tripUpdate.stopTimeUpdate.sort((a, b) => {
+                    return Number.parseInt(a['stopSequence'], 10) - Number.parseInt(b['stopSequence'], 10);
+                });
             }
         }
     };

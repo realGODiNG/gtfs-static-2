@@ -5,11 +5,11 @@
                 <slot name="header">
                     <b-navbar toggleable="lg" type="dark" variant="dark">
                         <b-navbar-brand>
-                            '{{ wrapper.title }}'
+                            Edit Timestamp
                         </b-navbar-brand>
                         <b-navbar-nav class="ml-auto">
                             <b-nav-form>
-                                <b-icon class="h3 m-1" icon="x-circle-fill" @click="close(true)" variant="danger" />
+                                <b-icon class="h3 m-1" icon="x-circle-fill" @click="close(false)" variant="danger" />
                             </b-nav-form>
                         </b-navbar-nav>
                     </b-navbar>
@@ -18,16 +18,22 @@
             <section id="texter-body">
                 <slot name="body">
                     <b-card>
-                        Value *
-                        <b-form-input size="sm" type="text" v-model="value" @keyup.enter="value.length != 0 ? close(false) : undefined" />
+                        Date *
+                        <b-form-input size="sm" type="date" v-model="cTimestamp[0]" />
+                        <br />
+                        Time *
+                        <b-form-input size="sm" type="time" step="1" v-model="cTimestamp[1]" />
                     </b-card>
                 </slot>
             </section>
             <footer id="texter-footer" class="centered">
                 <slot name="footer">
                     <b-card>
-                        <b-button class="m-1" type="button" variant="dark" @click="close(false)" :disabled='value.length == 0'>
-                            Confirm
+                        <b-button class="m-1" type="button" variant="dark" @click="close(true)" :disabled='cTimestamp[0].length * cTimestamp[1].length == 0'>
+                            Save
+                        </b-button>
+                        <b-button class="m-1" type="button" variant="dark" @click="close(false)">
+                            Discard
                         </b-button>
                     </b-card>
                 </slot>
@@ -42,28 +48,21 @@
 
         data() {
             return {
-                /** @type {!String} */
-                value: ''
-            }
-        },
-        mounted() {
-            if (typeof this.wrapper.prevalue === 'string') {
-                this.value = this.wrapper.prevalue;
+                /** @type {!Array.<!String>} */
+                cTimestamp: this.converter(this.timestamp),
             }
         },
         props: {
-            'wrapper': { callback: !Function, title: !String, prevalue: !String }
+            'converter': Function,
+            'timestamp': Number
         },
 
         methods: {
             /**
-             * @param {!Boolean} canceled
+             * @param {!Boolean} decision
              */
-            close(canceled) {
-                if (!canceled) {
-                    this.wrapper.callback(this.value);
-                }
-                this.$emit('close');
+            close(decision) {
+                this.$emit('close', decision ? this.converter(this.cTimestamp): null);
             }
         }
     };
