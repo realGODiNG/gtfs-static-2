@@ -32,10 +32,11 @@ npm run serve
 npm run build
 ```
 
-### Lints and fixes files
+### Screenshots
 ```
-npm run lint
+![Alt text](/screenshots/station.jpg?raw=true "UI - Station")
+![Alt text](/screenshots/trip.jpg?raw=true "UI - Trip")
+![Alt text](/screenshots/picker.jpg?raw=true "UI - Entry Picker")
+![Alt text](/screenshots/realtime.jpg?raw=true "UI - Trip Update")
+![Alt text](/screenshots/file.jpg?raw=true "UI - Full File Table")
 ```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
