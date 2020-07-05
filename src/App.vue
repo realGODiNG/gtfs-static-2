@@ -73,9 +73,6 @@
                     <b-nav-item id="create-record" @click="table.createRecord()" v-if="table !== null && table.callback === null">
                         Add Record
                     </b-nav-item>
-                    <b-nav-item id="create-record" v-else disabled>
-                        Add Record
-                    </b-nav-item>
                 </b-navbar-nav>
                 <b-nav-form class="ml-auto" v-if="diversTable !== null">
                     <form @submit.prevent>
@@ -2434,6 +2431,7 @@
                     callback: routeID => {
                         const route = this.dataset.get('routes').createRecord([{ property: 'route_id', value: routeID }]);
                         this.set(this.record['route_id'], route['route_id']);
+
                     },
                     title: 'Create \'Route\'',
                     identifier: 'Route ID'
@@ -2689,6 +2687,8 @@
             }
             if (entry.set(data) && !entry.record.__isShadow) {
                 switch (entry.field.getFullIdentifier()) {
+                    case 'trips.route_id':
+                        // fallsthrough
                     case 'trips.service_id':
                         this.update('full');
                         this.key += 1;
