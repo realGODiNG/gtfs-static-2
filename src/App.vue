@@ -188,6 +188,10 @@
                             v-b-tooltip.hover="{ placement: 'top', title: 'Edit trip update.' }"
                             @click="realtimeTable.editTripUpdate(data.item['id'])"
                         />
+                        <b-icon class="m-1" icon="files"
+                            v-b-tooltip.hover="{ placement: 'top', title: 'Copy trip update.' }"
+                            @click="realtimeTable.copyTripUpdate(data.item['id'])"
+                        />
                         <b-icon class="m-1" icon="trash"
                             v-b-tooltip.hover="{ placement: 'top', title: 'Delete trip update.' }"
                             @click="realtimeTable.deleteTripUpdate(data.item['id'])"
@@ -242,7 +246,9 @@
                                         v-model="pickerDate"
                                         is-expanded is-inline
                                         :select-attribute="{ dot: true }"
+                                        color="#ffffff"
                                     />
+                                    <!-- invalide value for color above is wanted in order to hide dot -->
                                 </span>
                                 <span :key="divers.stopsKey" v-else-if="element.action.special === 'trips.stop_times'">
                                     <SimpleTable :fields="divers.stopFields" :items="divers.stopItems" :move="divers.stopMove"
@@ -274,17 +280,19 @@
                                         />  
                                     </div>
                                     <div class="centered">
-                                        Use "ctrl + right-click" to set position.
+                                        (Use "ctrl + right-click" to set position.)
                                     </div>
                                 </fragment>
                                 <span :key="divers.transfersKey" v-else-if="element.action.special === 'stops.transfers'">
                                     <SimpleTable :fields="divers.transferFields" :items="divers.transferItems" :move="null"
                                         :needsStopPicker="needsStopPicker" :gtfsStopTrees="x => gtfsStopTrees(x, divers.record)"
+                                        :stopPreFilter="divers.record['stop_id'].get()"
                                     />
                                 </span>
                                 <span :key="divers.pathwaysKey" v-else-if="element.action.special === 'stops.pathways'">
                                     <SimpleTable :fields="divers.pathwayFields" :items="divers.pathwayItems" :move="null"
                                         :needsStopPicker="needsStopPicker" :gtfsStopTrees="x => gtfsStopTrees(x, divers.record)"
+                                        :stopPreFilter="divers.record['stop_id'].get()"
                                     />
                                 </span>
                             </fragment>
@@ -354,6 +362,7 @@
         <SimpleStop :entry="childStopEntry"
             :setter="divers.set"
             :trees="gtfsStopTrees(childStopEntry, divers.record)"
+            :preFilter="childStopEntry.field.getFullIdentifier() === 'stops.parent_station' ? divers.record['stop_id'].get() : undefined"
             @close="childStopEntry = null; divers.update($event ? 'full' : ''); divers.key += $event"
             v-if="divers !== null && childStopEntry !== null"
         />
@@ -613,10 +622,10 @@
             const year = date.getFullYear().toString();
             const month = '0' + (date.getMonth() + 1);
             const day = '0' + date.getDate();
-            const hours = '0' + date.getHours();
+            const hours = date.getHours().toString();
             const minutes = '0' + date.getMinutes();
             const seconds = '0' + date.getSeconds();
-            return [ year + '-' + month.substr(-2) + '-' + day.substr(-2), hours.substr(-2) + ':' + minutes.substr(-2) + ':' + seconds.substr(-2) ];
+            return [ year + '-' + month.substr(-2) + '-' + day.substr(-2), hours + ':' + minutes.substr(-2) + ':' + seconds.substr(-2) ];
         }
     }
 
@@ -794,6 +803,8 @@
          * @param {!TripUpdate} tripUpdate
          */
         addTripUpdate(__tripUpdate) {
+            const timeRegex = '[0-3]?\\d:[0-5]\\d:[0-5]\\d|4[0-7]:[0-5]\\d:[0-5]\\d';
+
             var index;
             if (__tripUpdate.entity === undefined) {
                 this.feed.entity.push(new Object());
@@ -819,7 +830,8 @@
             if (__tripUpdate.tripUpdate.trip['directionId'].length != 0) {
                 trip['directionId'] = Number.parseInt(this.dataset.get('trips').get('direction_id').types[0].enumeration.fromHTML(__tripUpdate.tripUpdate.trip['directionId']), 10);
             }
-            if (__tripUpdate.tripUpdate.trip['startTime'].length != 0) {
+            var regex = __tripUpdate.tripUpdate.trip['startTime'].match(timeRegex);
+            if (regex !== null && regex[0] === __tripUpdate.tripUpdate.trip['startTime']) {
                 trip['startTime'] = __tripUpdate.tripUpdate.trip['startTime'];
             }
             trip['startDate'] = __tripUpdate.tripUpdate.trip['startDate'].split('-').join('');
@@ -829,8 +841,8 @@
             if (__tripUpdate.tripUpdate.timestamp[0].length * __tripUpdate.tripUpdate.timestamp[1].length != 0) {
                 tripUpdate['timestamp'] = convertTimestamp(__tripUpdate.tripUpdate.timestamp);
             }
-            var regex = __tripUpdate.tripUpdate.delay.match('[-]?\\d*');
-            if ((__tripUpdate.tripUpdate.delay.length != 0 && regex !== null && regex[0] === __tripUpdate.tripUpdate.delay)
+            regex = __tripUpdate.tripUpdate.delay.match('[-]?\\d*');
+            if ((regex !== null && regex[0] === __tripUpdate.tripUpdate.delay)
                 && __tripUpdate.tripUpdate.trip.scheduleRelationship !== 'ADDED'
                 && __tripUpdate.tripUpdate.trip.scheduleRelationship !== 'CANCELED'
             ) {
@@ -849,13 +861,13 @@
                         __stopTimeUpdate['departureTime'] = '';
                     }
                     regex = __stopTimeUpdate['stopSequence'].match('\\d*');
-                    const arrivalRegex = __stopTimeUpdate['arrivalTime'].match('[0-3]?\\d:[0-5]\\d:[0-5]\\d|4[0-7]:[0-5]\\d:[0-5]\\d');
-                    const departureRegex = __stopTimeUpdate['departureTime'].match('[0-3]?\\d:[0-5]\\d:[0-5]\\d|4[0-7]:[0-5]\\d:[0-5]\\d');
+                    const arrivalRegex = __stopTimeUpdate['arrivalTime'].match(timeRegex);
+                    const departureRegex = __stopTimeUpdate['departureTime'].match(timeRegex);
                     if (__stopTimeUpdate['scheduleRelationship'].length != 0
                         || (__stopTimeUpdate['stopSequence'].length != 0 && regex !== null && regex[0] === __stopTimeUpdate['stopSequence'])
                         || __stopTimeUpdate['stopId'].length != 0
-                        || (__stopTimeUpdate['arrivalTime'].length != 0 && arrivalRegex !== null && arrivalRegex[0] === __stopTimeUpdate['arrivalTime'])
-                        || (__stopTimeUpdate['departureTime'].length != 0 && departureRegex !== null && departureRegex[0] === __stopTimeUpdate['departureTime'])
+                        || (arrivalRegex !== null && arrivalRegex[0] === __stopTimeUpdate['arrivalTime'])
+                        || (departureRegex !== null && departureRegex[0] === __stopTimeUpdate['departureTime'])
                     ) {
                         stopTimeUpdate.push(new Object());
                         var e = stopTimeUpdate[stopTimeUpdate.length - 1];
@@ -865,11 +877,11 @@
                         if (__stopTimeUpdate['stopId'].length != 0) {
                             e['stopId'] = __stopTimeUpdate['stopId'];
                         }
-                        if (__stopTimeUpdate['arrivalTime'].length != 0 && arrivalRegex !== null && arrivalRegex[0] === __stopTimeUpdate['arrivalTime']) {
+                        if (arrivalRegex !== null && arrivalRegex[0] === __stopTimeUpdate['arrivalTime']) {
                             e['arrival'] = new Object();
                             e['arrival']['time'] = convertTimestamp([ __tripUpdate.tripUpdate.trip['startDate'], __stopTimeUpdate['arrivalTime'] ]);
                         }
-                        if (__stopTimeUpdate['departureTime'].length != 0 && departureRegex !== null && departureRegex[0] === __stopTimeUpdate['departureTime']) {
+                        if (departureRegex !== null && departureRegex[0] === __stopTimeUpdate['departureTime']) {
                             e['departure'] = new Object();
                             e['departure']['time'] = convertTimestamp([ __tripUpdate.tripUpdate.trip['startDate'], __stopTimeUpdate['departureTime'] ]);
                         }
@@ -918,8 +930,9 @@
          * @param {?String} childId
          * @param {!Boolean} existsInRealTime
          * @param {?Record} childTrip
+         * @param {!Boolean} willBeCopy
          */
-        constructor(realtime, childId, existsInRealTime, childTrip) {
+        constructor(realtime, childId, existsInRealTime, childTrip, willBeCopy) {
             /** @type {!Object|undefined} */
             this.entity = existsInRealTime ? realtime.feed.entity.find(entity => entity['id'] === childId) : undefined;
 
@@ -927,7 +940,7 @@
             const trip = tripUpdate !== undefined ? tripUpdate['trip'] : undefined;
 
             /** @type {!String} */
-            this.id = this.entity !== undefined ? this.entity['id'] : 'ID-' + Math.floor(new Date().getTime() / 1000);
+            this.id = this.entity !== undefined && !willBeCopy ? this.entity['id'] : 'ID-' + Math.floor(new Date().getTime() / 1000);
 
             /** @type {!Object} */
             this.tripUpdate = {
@@ -967,17 +980,32 @@
                 }
             }
             if (childTrip instanceof Record && childTrip.__file.identifier === 'trips') {
-                childTrip['trip_id'].children.forEach(child => {
+                const timeToSeconds = time => {
+                    if (time.length == 0) {
+                        return 86400;
+                    }
+                    const [ hours, minutes, seconds ] = time.split(':');
+                    return Number.parseInt(hours, 10) * 3600 + Number.parseInt(minutes, 10) * 60 + Number.parseInt(seconds, 10);
+                }
+                var startTime = '48:00:00';
+                childTrip['trip_id'].children.forEach(child => { 
                     if (child.record.__file.identifier === 'stop_times') {
+                        const __departureTime = child.record['departure_time'].get();
                         this.tripUpdate.stopTimeUpdate.push({
                             stopSequence: child.record['stop_sequence'].get(),
                             stopId: child.record['stop_id'].get(),
                             arrivalTime: child.record['arrival_time'].get(),
-                            departureTime: child.record['departure_time'].get(),
+                            departureTime: __departureTime,
                             scheduleRelationship: 'SCHEDULED'
                         });
+                        if (timeToSeconds(__departureTime) < timeToSeconds(startTime)) {
+                            startTime = __departureTime;
+                        }
                     }
-                })
+                });
+                if (startTime !== '48:00:00') {
+                    this.tripUpdate.trip.startTime = startTime;
+                }
             } else if (tripUpdate !== undefined && tripUpdate['stopTimeUpdate'] !== undefined) {
                 tripUpdate['stopTimeUpdate'].forEach(e => {
                     this.tripUpdate.stopTimeUpdate.push({
@@ -1012,6 +1040,10 @@
             this.tripUpdate.stopTimeUpdate.sort((a, b) => {
                 return Number.parseInt(a['stopSequence'], 10) - Number.parseInt(b['stopSequence'], 10);
             });
+
+            if (willBeCopy) {
+                this.entity = undefined;
+            }
         }
     }
 
@@ -1994,6 +2026,12 @@
         /**
          * @param {!String} id
          */
+        copyTripUpdate(id) {
+            this.vue.currentTripUpdate = new TripUpdate(this.realtime, id, true, null, true);
+        }
+        /**
+         * @param {!String} id
+         */
         deleteTripUpdate(id) {
             const index = this.realtime.feed.entity.findIndex(entity => entity['id'] === id);
             if (index != -1) {
@@ -2005,7 +2043,7 @@
          * @param {!String} id
          */
         editTripUpdate(id) {
-            this.vue.currentTripUpdate = new TripUpdate(this.realtime, id, true, null);
+            this.vue.currentTripUpdate = new TripUpdate(this.realtime, id, true, null, false);
         }
     }
 
@@ -2041,7 +2079,7 @@
             this.key = 0;
 
              /** @type {!Array.<!String>} */
-            this.stationFields = [ 'stop_id', 'stop_name', 'location_type', 'platform_code', '__action' ];
+            this.stationFields = [ 'stop_id', 'stop_name', 'location_type', 'platform_code', '__actions' ];
 
             /** @type {!Function} */
             this.stationHandler = (type, object) => {
@@ -2051,13 +2089,16 @@
                         shadow.__file.addShadowRecord();
                         shadow['stop_name'].set(this.record['stop_name'].get());
                         shadow['parent_station'].set(this.record['stop_id'].get());
+                        this.currentStop = shadow.__file.records[shadow.__file.records.length - 1];
+                        this.tree.select(this.currentStop['stop_id'].get());
+                        this.update('stop');
                         this.update('tree');
                         this.stationKey += 1;
                         return;
                     case 'delete':
                         if (this.currentStop.__isEqual(object)) {
                             this.currentStop = this.record;
-                            this.tree.select(object['stop_id'].get());
+                            this.tree.select(this.currentStop['stop_id'].get());
                             this.update('stop');
                         }
                         object.__delete();
@@ -2069,7 +2110,7 @@
                         return;
                     case 'select':
                         this.currentStop = object;
-                        this.tree.select(object['stop_id'].get());
+                        this.tree.select(this.currentStop['stop_id'].get());
                         this.update('stop');
                         this.stationKey += 1;
                         return;
@@ -2109,7 +2150,7 @@
             this.currentStop = this.record;
 
             /** @type {!Function} */
-            this.transferFields = () => [ 'from_stop_id', 'to_stop_id', 'transfer_type', 'min_transfer_time', '__action' ];
+            this.transferFields = () => [ 'from_stop_id', 'to_stop_id', 'transfer_type', 'min_transfer_time', '__actions' ];
 
             /** @type {!Function} */
             this.transferItems = () => {
@@ -2124,7 +2165,7 @@
             this.transfersKey = 3000;
 
             /** @type {!Function} */
-            this.pathwayFields = () => [ 'from_stop_id', 'to_stop_id', 'pathway_mode', 'is_bidirectional', 'length', 'traversal_time', 'stair_count', '__action' ];
+            this.pathwayFields = () => [ 'from_stop_id', 'to_stop_id', 'pathway_mode', 'is_bidirectional', 'length', 'traversal_time', 'stair_count', '__actions' ];
 
             /** @type {!Function} */
             this.pathwayItems = () => {
@@ -2313,7 +2354,7 @@
             this.calendarKey = 1000;
 
             /** @type {!Function} */
-            this.stopFields = () => [ 'stop_id', 'arrival_time', 'departure_time', 'pickup_type', 'drop_off_type', 'stop_headsign', '__action' ];
+            this.stopFields = () => [ 'stop_id', 'arrival_time', 'departure_time', 'pickup_type', 'drop_off_type', 'stop_headsign', '__actions' ];
 
             /** @type {!Function} */
             this.stopItems = () => {
@@ -2349,7 +2390,7 @@
             this.stopsKey = 2000;
 
             /** @type {!Function} */
-            this.frequencyFields = () => [ 'start_time', 'end_time', 'headway_secs', 'exact_times', '__action' ];
+            this.frequencyFields = () => [ 'start_time', 'end_time', 'headway_secs', 'exact_times', '__actions' ];
 
             /** @type {!Function} */
             this.frequencyItems = () => {
@@ -2394,7 +2435,8 @@
                         const route = this.dataset.get('routes').createRecord([{ property: 'route_id', value: routeID }]);
                         this.set(this.record['route_id'], route['route_id']);
                     },
-                    title: 'Route ID'
+                    title: 'Create \'Route\'',
+                    identifier: 'Route ID'
                 },
                 icon: null,
                 text: 'New'
@@ -2493,7 +2535,8 @@
                                         this.set(this.record['service_id'], service_id);
                                     }
                                 },
-                                title: 'Service ID'
+                                title: 'Create \'Service\'',
+                                identifier: 'Service ID'
                             },
                             icon: null,
                             text: 'New'
@@ -2785,7 +2828,8 @@
                         this.realtime.reset();
                         this.dataset.reset(filename);
                     },
-                    title: 'Filename'
+                    title: 'Create \'Dataset\'',
+                    identifier: 'Filename'
                 };
             },
             createRealtime() {
@@ -2794,7 +2838,8 @@
                         this.resetDisplay();
                         this.realtime.reset(filename);
                     },
-                    title: 'Filename'
+                    title: 'Create \'Realtime Feed\'',
+                    identifier: 'Filename'
                 };  
             },
             /**
@@ -2862,7 +2907,8 @@
                             { property: 'location_type', value: station }
                         ]));
                     },
-                    title: 'Stop ID'
+                    title: 'Create \'Station\'',
+                    identifier: 'Stop ID'
                 };
             },
             createTrip() {
@@ -2870,7 +2916,8 @@
                     callback: tripID => {
                         this.selectTrip(this.dataset.get('trips').createRecord([ { property: 'trip_id', value: tripID } ]))
                     },
-                    title: 'Trip ID'
+                    title: 'Create \'Trip\'',
+                    identifier: 'Trip ID'
                 };
             },
             /**
@@ -2878,14 +2925,9 @@
              */
             createTripUpdate(trip) {
                 if (trip instanceof Record) {
-                    this.currentTripUpdate = new TripUpdate(this.realtime, null, false, trip);
+                    this.currentTripUpdate = new TripUpdate(this.realtime, null, false, trip, false);
                 } else {
-                    this.texterWrapper = {
-                        callback: tripID => {
-                            this.currentTripUpdate = new TripUpdate(this.realtime, tripID, false, null);
-                        },
-                        title: 'Trip ID'
-                    };
+                    this.currentTripUpdate = new TripUpdate(this.realtime, '', false, null, false);
                 }
             },
 
@@ -2966,8 +3008,9 @@
                         this.dataset.filename = filename;
                         this.mainKey += 1;
                     },
-                    title: 'Filename',
-                    prevalue: this.dataset.filename
+                    title: 'Edit \'Dataset\'',
+                    identifier: 'Filename',
+                    value: this.dataset.filename
                 };
             },
             editRealtimeFilename() {
@@ -2976,8 +3019,9 @@
                         this.realtime.filename = filename;
                         this.mainKey += 1;
                     },
-                    title: 'Filename',
-                    prevalue: this.realtime.filename
+                    title: 'Edit \'Realtime Feed\'',
+                    identifier: 'Filename',
+                    value: this.realtime.filename
                 };
             },
             /**

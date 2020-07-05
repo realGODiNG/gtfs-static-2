@@ -5,7 +5,7 @@
                 <slot name="header">
                     <b-navbar toggleable="lg" type="dark" variant="dark">
                         <b-navbar-brand>
-                            Edit Record
+                            Edit 'Record'
                         </b-navbar-brand>
                         <b-navbar-nav class="ml-auto">
                             <b-nav-item disabled>

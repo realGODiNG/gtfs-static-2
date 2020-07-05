@@ -139,7 +139,7 @@
              * @returns {!Boolean>}
              */
             __hasShadow() {
-                return this.fields.length != 0 && this.fields[this.fields.length - 1] === '__action';
+                return this.fields.length != 0 && this.fields[this.fields.length - 1] === '__actions';
             },
 
             /**

@@ -26,7 +26,7 @@
             </header>
             <section id="simple-stop-body">
                 <slot name="body">
-                    <b-card :key="mainKey">
+                    <b-card :key="mainKey" :style="{ 'min-width': '1000px' }">
                         <SimpleTree :fields="fields" :handler="handler"
                             :root="filteredTrees[0]"
                             :trees="filteredTrees.slice(1)"
@@ -78,7 +78,15 @@
         props: {
             'entry': Object,
             'setter': Function,
-            'trees': Array
+            'trees': Array,
+            'preFilter': String
+        },
+
+        mounted() {
+            if (typeof this.preFilter === 'string') {
+                this.filterWrapper = this.preFilter;
+                this.applyFilter();
+            }
         },
 
         methods: {

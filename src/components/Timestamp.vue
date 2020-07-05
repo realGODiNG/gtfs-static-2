@@ -5,7 +5,7 @@
                 <slot name="header">
                     <b-navbar toggleable="lg" type="dark" variant="dark">
                         <b-navbar-brand>
-                            Edit Timestamp
+                            Edit 'Realtime Feed'
                         </b-navbar-brand>
                         <b-navbar-nav class="ml-auto">
                             <b-nav-form>
@@ -18,10 +18,10 @@
             <section id="texter-body">
                 <slot name="body">
                     <b-card>
-                        Date *
+                        Timestamp (Date) *
                         <b-form-input size="sm" type="date" v-model="cTimestamp[0]" />
                         <br />
-                        Time *
+                        Timestamp (Time) *
                         <b-form-input size="sm" type="time" step="1" v-model="cTimestamp[1]" />
                     </b-card>
                 </slot>

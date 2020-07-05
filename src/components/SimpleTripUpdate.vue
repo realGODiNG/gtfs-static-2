@@ -5,7 +5,7 @@
                 <slot name="header">
                     <b-navbar toggleable="lg" type="dark" variant="dark">
                         <b-navbar-brand>
-                            Edit Trip Update
+                            {{ (tripUpdate.entity === undefined ? 'Create' : 'Edit') + ' \'Trip Update\'' }}
                         </b-navbar-brand>
                         <b-navbar-nav class="ml-auto">
                             <b-nav-form>
@@ -20,23 +20,23 @@
                     <b-card title="Trip">
                         <b-table-simple fixed small>
                             <b-tr>
-                                <b-td>
+                                <b-td colspan="2">
                                     Trip ID *
                                     <b-form-input size="sm" type="text"
                                         :value="tripUpdate.tripUpdate.trip.tripId"
                                         @change="setTripId($event)"
                                     />
                                 </b-td>
-                                <b-td>
+                                <b-td colspan="2">
                                     Route ID
                                     <b-form-input size="sm" type="text"
                                         :placeholder="getRouteDisplayText()"
                                         :value="new String()"
-                                        @click="routeId = routeShadow['route_id'];"
+                                        @click="routeShadow['route_id'].set(tripUpdate.tripUpdate.trip.routeId); routeId = routeShadow['route_id']"
                                         :disabled="tripExists"
                                     />
                                 </b-td>
-                                <b-td>
+                                <b-td colspan="2">
                                     Direction
                                     <b-form-select size="sm"
                                         :value="tripUpdate.tripUpdate.trip.directionId"
@@ -50,18 +50,20 @@
                                 </b-td>
                             </b-tr>
                             <b-tr>
-                                <b-td>
+                                <b-td colspan="2">
                                     Start Date *
                                     <b-form-input type="date"  size="sm"
                                         :value="tripUpdate.tripUpdate.trip.startDate"
                                         @change="tripUpdate.tripUpdate.trip.startDate = $event; mainKey += 1"
                                     />
                                 </b-td>
-                                <b-td>
+                                <b-td colspan="2">
                                     Start Time
-                                    <b-form-input type="time" step="1" v-model="tripUpdate.tripUpdate.trip.startTime" size="sm" />
+                                    <b-form-input size="sm" type="text" v-model="tripUpdate.tripUpdate.trip.startTime"
+                                        :pattern="'[0-3]?\\d:[0-5]\\d:[0-5]\\d|4[0-7]:[0-5]\\d:[0-5]\\d'"
+                                    />
                                 </b-td>
-                                <b-td>
+                                <b-td colspan="2">
                                     Schedule Relationship
                                     <b-form-select size="sm"
                                         :value="tripUpdate.tripUpdate.trip.scheduleRelationship"
@@ -71,6 +73,18 @@
                                             {{ value }}
                                         </option>
                                     </b-form-select>
+                                </b-td>
+                            </b-tr>
+                            <b-tr v-if="tripUpdate.tripUpdate.trip.scheduleRelationship !== 'CANCELED'">
+                                <b-td colspan="1">
+                                    <b-form-input type="number" step="1" v-model="seconds" size="sm" />
+                                </b-td>
+                                <b-td colspan="5">
+                                    <b-button size="sm" type="button" @click="__addSeconds()" variant="dark" :disabled="seconds.length == 0">
+                                        Add Seconds
+                                    </b-button>
+                                    <b-icon size="sm" icon="blank" />
+                                    (Use this to modify 'Start Time' and 'Arrival / Departure Time' for all existing stops at once.)
                                 </b-td>
                             </b-tr>
                         </b-table-simple>
@@ -101,7 +115,7 @@
                         </b-table-simple>
                     </b-card>
                     <b-card title="Stops" v-if="tripUpdate.tripUpdate.trip.scheduleRelationship !== 'CANCELED'">
-                        <b-table-simple fixed hover small striped :style="{ width: '1200px' }">
+                        <b-table-simple fixed hover small striped :style="{ 'min-width': '1200px' }">
                             <b-thead>
                                 <b-tr>
                                     <b-th colspan="2">
@@ -143,7 +157,7 @@
                                         <b-form-input type="text"
                                             :placeholder="getStopDisplayText(stopTimeUpdate)"
                                             :value="new String()"
-                                            @click="stopId = stopShadow['stop_id']; currentStopTimeUpdate = stopTimeUpdate;"
+                                            @click="stopShadow['stop_id'].set(stopTimeUpdate.stopId); stopId = stopShadow['stop_id']; currentStopTimeUpdate = stopTimeUpdate;"
                                             size="sm"
                                         />
                                     </b-td>
@@ -199,9 +213,9 @@
                         <b-button class="m-1" type="button" @click="close(true)" variant="dark"
                             :disabled="tripUpdate.id.length * tripUpdate.tripUpdate.trip['tripId'].length * tripUpdate.tripUpdate.trip['startDate'].length == 0"
                         >
-                            Save
+                            {{ tripUpdate.entity === undefined ? 'Confirm' : 'Save' }}
                         </b-button>
-                        <b-button class="m-1" type="button" @click="close(false)" variant="dark">
+                        <b-button class="m-1" type="button" @click="close(false)" variant="dark" v-if="tripUpdate.entity !== undefined">
                             Discard
                         </b-button>
                     </b-card>
@@ -233,7 +247,6 @@
             SimpleStop
         },
 
-
         data() {
             return {
                 /** @type {!Number} */
@@ -261,7 +274,10 @@
                 currentStopTimeUpdate: null,
 
                 /** @type {!Object} */
-                shadowStopTimeUpdate: { stopSequence: '', stopId: '', arrivalTime: '', departureTime: '', scheduleRelationship: 'SCHEDULED' }
+                shadowStopTimeUpdate: { stopSequence: '', stopId: '', arrivalTime: '', departureTime: '', scheduleRelationship: 'SCHEDULED' },
+
+                /** @type {!String} */
+                seconds: ''
             };
         },
         mounted() {
@@ -283,6 +299,41 @@
                     scheduleRelationship: this.shadowStopTimeUpdate['scheduleRelationship']
                 });
                 this.shadowStopTimeUpdate = { stopSequence: '', stopId: '', arrivalTime: '', departureTime: '', scheduleRelationship: 'SCHEDULED' };
+            },
+            __addSeconds() {
+                const convert = time => {
+                    if (typeof time === 'string') {
+                        const [ hours, minutes, seconds ] = time.split(':');
+                        return Number.parseInt(hours, 10) * 3600 + Number.parseInt(minutes, 10) * 60 + Number.parseInt(seconds, 10);
+                    } else {
+                        var seconds = time;
+                        const hours = Math.floor(seconds / 3600);
+                        seconds -= hours * 3600;
+                        const minutes = Math.floor(seconds / 60);
+                        seconds -= minutes * 60;
+                        return hours.toString() + ':' + ('0' + minutes).substr(-2) + ':' + ('0' + seconds).substr(-2);
+                    }
+                };
+                const isValid = time => {
+                    const regex = time.match('[0-3]?\\d:[0-5]\\d:[0-5]\\d|4[0-7]:[0-5]\\d:[0-5]\\d');
+                    return regex !== null && regex[0] === time;
+                };
+                const __seconds = Number.parseInt(this.seconds, 10);
+                if (!isNaN(__seconds)) {
+                    if (isValid(this.tripUpdate.tripUpdate.trip['startTime'])) {
+                        this.tripUpdate.tripUpdate.trip['startTime'] = convert(convert(this.tripUpdate.tripUpdate.trip['startTime']) + __seconds);
+                    }
+                    this.tripUpdate.tripUpdate.stopTimeUpdate.forEach(stopTimeUpdate => {
+                        if (isValid(stopTimeUpdate['arrivalTime'])) {
+                            stopTimeUpdate['arrivalTime'] = convert(convert(stopTimeUpdate['arrivalTime']) + __seconds);
+                        }
+                        if (isValid(stopTimeUpdate['departureTime'])) {
+                            stopTimeUpdate['departureTime'] = convert(convert(stopTimeUpdate['departureTime']) + __seconds);
+                        }
+                    });
+                    this.seconds = '';
+                    this.mainKey += 1;
+                }
             },
             /**
              * @param {!Number} index

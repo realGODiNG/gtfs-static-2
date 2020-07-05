@@ -73,6 +73,7 @@
         <SimpleStop :entry="childStopEntry"
             :setter="__set"
             :trees="gtfsStopTrees(childStopEntry)"
+            :preFilter="childStopEntry.record.__isShadow ? stopPreFilter : undefined"
             @close="childStopEntry = null"
             v-if="childStopEntry !== null"
         />
@@ -108,7 +109,8 @@
             'move': Function,
             'needsStopPicker': Function,
             'refresh': Function,
-            'gtfsStopTrees': Function
+            'gtfsStopTrees': Function,
+            'stopPreFilter': String
         },
 
         methods: {
