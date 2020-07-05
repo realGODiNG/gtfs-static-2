@@ -12,8 +12,14 @@
                                 <form @submit.prevent>
                                     <b-form-input class="m-1" v-model="filterWrapper" placeholder="Filter" size="sm" @keyup.enter="applyFilter()" />
                                 </form>
-                                <b-icon class="m-1" icon="trash" @click="applyFilter(true)" :variant="filter.length != 0 ? 'light' : 'dark'" />
-                                <b-icon class="m-1" icon="search" @click="applyFilter()" variant="light" />
+                                <b-icon class="m-1" icon="trash" @click="applyFilter(true)" variant="light"
+                                    v-b-tooltip.hover="{ placement: 'top', title: 'Clear filter.' }"
+                                    v-if="filter.length != 0"
+                                />
+                                <b-icon class="m-1" icon="blank" v-else />
+                                <b-icon class="m-1" icon="search" @click="applyFilter()" variant="light"
+                                    v-b-tooltip.hover="{ placement: 'top', title: 'Apply filter.' }"
+                                />
                             </b-nav-form>
                         </b-navbar-nav>
                         <b-navbar-nav class="ml-auto">
@@ -36,11 +42,17 @@
                             <template v-slot:cell()="data">
                                 <span class="centered" v-if="data.value.record === undefined">
                                     <fragment v-if="data.item.__isShadow">
-                                        <b-icon class="m-1" icon="plus" @click="data.item.__file.addShadowRecord()"/>
+                                        <b-icon class="m-1" icon="plus" @click="data.item.__file.addShadowRecord()"
+                                            v-b-tooltip.hover="{ placement: 'top', title: 'Add record.' }"
+                                        />
                                     </fragment>
                                     <fragment v-else>
-                                        <b-icon class="m-1" icon="check" @click="handler('select', data.item)" />
-                                        <b-icon class="m-1" icon="trash" @click="data.item.__delete()" />
+                                        <b-icon class="m-1" icon="check" @click="handler('select', data.item)"
+                                            v-b-tooltip.hover="{ placement: 'top', title: 'Select record.' }"
+                                        />
+                                        <b-icon class="m-1" icon="trash" @click="data.item.__delete()"
+                                            v-b-tooltip.hover="{ placement: 'top', title: 'Delete record.' }"
+                                        />
                                     </fragment>
                                 </span>
                                 <b-form-input size="sm"
@@ -59,7 +71,9 @@
                             </template>
                             <template v-slot:cell()="data">
                                 <span class="centered" v-if="data.value.record === undefined">
-                                    <b-icon class="m-1" icon="check" @click="handler('select', data.item)" />
+                                    <b-icon class="m-1" icon="check" @click="handler('select', data.item)"
+                                        v-b-tooltip.hover="{ placement: 'top', title: 'Select record.' }"
+                                    />
                                 </span>
                                 <fragment v-else-if="entry.record.__isShadow ? data.value.record[entry.field.identifier].get() === entry.data : data.value.record.__isEqual(entry.data !== null ? entry.data.record : null)">
                                     <b>

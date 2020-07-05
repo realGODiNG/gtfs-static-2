@@ -24,7 +24,9 @@
                                     </option>
                                 </b-form-select>
                             <span class="centered">
-                                <b-icon class="m-1" icon="plus" @click="handler('add')" />
+                                <b-icon class="m-1" icon="plus" @click="handler('add')"
+                                    v-b-tooltip.hover="{ placement: 'top', title: 'Add record.' }"
+                                />
                             </span>
                             </fragment>
                             <fragment v-else-if="entry.isChild()">
@@ -69,17 +71,24 @@
                             <b-icon icon="blank" v-for="(value, index) in new Array(depth)" :key="'useless-' + index" />     
                         </fragment>
                         <fragment v-if="root.children.length != 0">
-                            <b-icon icon="dash" @click="toogle()" v-if="root.isOpened" />
-                            <b-icon icon="plus" @click="toogle()" v-else />
+                            <b-icon icon="dash" @click="toogle()" v-if="root.isOpened"
+                                v-b-tooltip.hover="{ placement: 'top', title: 'Close tree node.' }"
+                            />
+                            <b-icon icon="plus" @click="toogle()" v-else
+                                v-b-tooltip.hover="{ placement: 'top', title: 'Open tree node.' }"
+                            />
                         </fragment>
                         <fragment v-else>
                             <b-icon icon="dot" />
                         </fragment>
                     </fragment>
                     <span class="centered" v-if="root.record[field] === undefined">
-                        <b-icon class="m-1" icon="check" @click="handler('select', root.record)" />
-                        &nbsp;
-                        <b-icon class="m-1" icon="trash" @click="handler('delete', root.record)" v-if="depth != 0" />
+                        <b-icon class="m-1" icon="check" @click="handler('select', root.record)"
+                            v-b-tooltip.hover="{ placement: 'top', title: 'Select record.' }"
+                        />
+                        <b-icon class="m-1" icon="trash" @click="handler('delete', root.record)" v-if="depth != 0"
+                            v-b-tooltip.hover="{ placement: 'top', title: 'Delete record.' }"
+                        />
                         <b-icon class="m-1" icon="blank" v-else />
                     </span>
                     <fragment v-else-if="root.isSelected">
@@ -93,8 +102,9 @@
                 </b-td>
                 <b-td v-if="!__hasShadow()">
                     <span class="centered">
-                        <b-icon class="m-1" icon="check" @click="handler('select', root.record)" v-if="handler('legal', root.record)" />
-                        <b-icon class="m-1" icon="blank" v-else />
+                        <b-icon class="m-1" icon="check" @click="handler('select', root.record)" v-if="handler('legal', root.record)"
+                            v-b-tooltip.hover="{ placement: 'top', title: 'Select record.' }"
+                        />
                     </span>
                 </b-td>
             </b-tr>

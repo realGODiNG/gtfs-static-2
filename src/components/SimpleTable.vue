@@ -9,17 +9,31 @@
             <template v-slot:cell()="data">
                 <span class="centered" v-if="data.value.record === undefined">
                     <fragment v-if="data.item.__isShadow">
-                        <b-icon class="m-1" icon="plus" @click="__addShadow(data.item.__file)"
-                            v-if="isFilled(data.item)"
-                        />
+                        <fragment v-if="isFilled(data.item)">
+                            <b-icon class="m-1" icon="plus" @click="__addShadow(data.item.__file)"
+                                v-b-tooltip.hover="{ placement: 'top', title: 'Add record.' }"
+                            />
+                            <b-icon class="m-1" icon="shuffle" @click="__addShadowBidirectional(data.item.__file)"
+                                v-b-tooltip.hover="{ placement: 'top', title: 'Add record bidirectionally.' }"
+                                v-if="data.item.__file.identifier === 'transfers'"
+                            />
+                        </fragment>
                     </fragment>
                     <fragment v-else-if="move !== null">
-                        <b-icon class="m-1" icon="arrow-up" @click="move(data.index, 'up')" />
-                        <b-icon class="m-1" icon="arrow-down" @click="move(data.index, 'down')" />
-                        <b-icon class="m-1" icon="trash" @click="__delete(data.item)" />
+                        <b-icon class="m-1" icon="arrow-up" @click="move(data.index, 'up')"
+                            v-b-tooltip.hover="{ placement: 'top', title: 'Move record up.' }"
+                        />
+                        <b-icon class="m-1" icon="arrow-down" @click="move(data.index, 'down')"
+                            v-b-tooltip.hover="{ placement: 'top', title: 'Move record down.' }"
+                        />
+                        <b-icon class="m-1" icon="trash" @click="__delete(data.item)"
+                            v-b-tooltip.hover="{ placement: 'top', title: 'Delete record.' }"
+                        />
                     </fragment>
                     <fragment v-else>
-                        <b-icon class="m-1" icon="trash" @click="__delete(data.item)" />
+                        <b-icon class="m-1" icon="trash" @click="__delete(data.item)"
+                            v-b-tooltip.hover="{ placement: 'top', title: 'Delete record.' }"
+                        />
                     </fragment>
                 </span>
                 <fragment v-else-if="data.value.hasPicker()">
@@ -123,6 +137,18 @@
                     this.refresh();
                 }
                 this.mainKey += 1;
+            },
+            /**
+             * @param {!File} file
+             */
+            __addShadowBidirectional(file) {
+                if (file.identifier === 'transfers') {
+                    file.createRecord(file.shadowRecord.__toArray());
+                    const fromStopId = file.shadowRecord['from_stop_id'].get();
+                    file.shadowRecord['from_stop_id'].set(file.shadowRecord['to_stop_id'].get());
+                    file.shadowRecord['to_stop_id'].set(fromStopId);
+                    this.__addShadow(file);
+                }
             },
             /**
              * @param {!Record} record

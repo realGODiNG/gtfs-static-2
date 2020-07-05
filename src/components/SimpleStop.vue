@@ -12,8 +12,14 @@
                                 <form @submit.prevent>
                                     <b-form-input class="m-1" v-model="filterWrapper" placeholder="Filter" size="sm" @keyup.enter="applyFilter()" />
                                 </form>
-                                <b-icon class="m-1" icon="trash" @click="applyFilter(true)" :variant="filter.length != 0 ? 'light' : 'dark'" />
-                                <b-icon class="m-1" icon="search" @click="applyFilter()" variant="light" />
+                                <b-icon class="m-1" icon="trash" @click="applyFilter(true)" variant="light"
+                                    v-b-tooltip.hover="{ placement: 'top', title: 'Clear filter.' }"
+                                    v-if="filter.length != 0"
+                                />
+                                <b-icon class="m-1" icon="blank" v-else />
+                                <b-icon class="m-1" icon="search" @click="applyFilter()" variant="light"
+                                    v-b-tooltip.hover="{ placement: 'top', title: 'Apply filter.' }"
+                                />
                             </b-nav-form>
                         </b-navbar-nav>
                         <b-navbar-nav class="ml-auto">

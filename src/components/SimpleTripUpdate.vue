@@ -185,8 +185,10 @@
                                         <span class="centered">
                                             <b-icon class="m-1" icon="trash" @click="__delete(index)"
                                                 v-if="index < tripUpdate.tripUpdate.stopTimeUpdate.length"
+                                                v-b-tooltip.hover="{ placement: 'top', title: 'Delete stop time update.' }"
                                             />
-                                            <b-icon class="m-1" icon="plus" @click="__add()"
+                                            <b-icon class="m-1" icon="plus" @click="__add()"    
+                                                v-b-tooltip.hover="{ placement: 'top', title: 'Add stop time update.' }"
                                                 v-else
                                             />
                                         </span>
