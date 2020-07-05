@@ -2,11 +2,15 @@
 
 ## Information
 ```
-* All data will be reset on page reloading - so do not reload, if you don't want to reset everything.
+* All data will be reset on page reloading.
+  So do not reload, if you don't want to reset everything.
 
-* All realtime data will be reset after creating or loading a static dataset - so you have to save all changes before doing this over the menu, if you want to.
+* All realtime data will be reset after creating or loading a static dataset.
+  So you have to save all changes before doing this over the menu, if you want to.
 
-* The file 'public/gtfs-static.xml' will only be used to generate gtfs structures, when serving the project. In production mode a constant string created from this file will be used instead - because of same-origin-policy. Keep that in mind, when changing this file. (see mounted function in 'src/App.vue' for more information)
+* The file 'public/gtfs-static.xml' will only be used to generate gtfs structures, when serving the project.
+  In production mode a constant string created from it will be used instead - because of same-origin-policy.
+  Keep that in mind, when changing this file. (see mounted function in 'src/App.vue' for more information)
 ```
 
 ## Project setup
@@ -32,11 +36,19 @@ npm run serve
 npm run build
 ```
 
-### Screenshots
-```
-![Alt text](/screenshots/station.jpg?raw=true "UI - Station")
-![Alt text](/screenshots/trip.jpg?raw=true "UI - Trip")
-![Alt text](/screenshots/picker.jpg?raw=true "UI - Entry Picker")
-![Alt text](/screenshots/realtime.jpg?raw=true "UI - Trip Update")
-![Alt text](/screenshots/file.jpg?raw=true "UI - Full File Table")
-```
+## Screenshots
+
+### User Interface: Station
+![Screenshot](/screenshots/station.png?raw=true)
+
+### User Interface: Trip
+![Screenshot](/screenshots/trip.png?raw=true)
+
+### User Interface: Entry Picker
+![Screenshot](/screenshots/picker.png?raw=true)
+
+### User Interface: Trip Update
+![Screenshot](/screenshots/realtime.png?raw=true)
+
+### User Interface: Full File Table
+![Screenshot](/screenshots/file.png?raw=true)
