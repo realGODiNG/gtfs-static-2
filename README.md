@@ -18,18 +18,6 @@ created as part of "Praktikum Algorithmen" (TU Darmstadt, summer semester 2020)
   Trip updates created by this app will always have this value - which is needed to compute times for the ui.
 ```
 
-## NPM dependencies
-```
-npm install jquery
-npm install vue bootstrap-vue bootstrap
-npm install gtfs-realtime-bindings
-npm install --save vue-fragment
-npm install --save v-calendar@next
-npm install --save jszip
-npm install --save file-saver
-npm install --save mapbox-gl
-```
-
 ## Project setup
 ```
 npm install
@@ -45,23 +33,10 @@ npm run serve
 npm run build
 ```
 
-
-## Links
+## Google transit APIs
 * ![GTFS Static](https://developers.google.com/transit/gtfs)
 * ![GTFS Realtime](https://developers.google.com/transit/gtfs-realtime)
-
-### NPM
-* ![jQuery](https://github.com/jquery/jquery)
-* ![Vue](https://github.com/vuejs/vue)
-* ![BootstrapVue](https://github.com/bootstrap-vue/bootstrap-vue)
-* ![Bootstrap](https://github.com/twbs/bootstrap)
-* ![vue-fragment](https://github.com/Thunberg087/vue-fragment)
-* ![V-Calendar](https://github.com/nathanreyes/v-calendar)
-* ![JSZip](https://github.com/Stuk/jszip)
-* ![FileSaver](https://github.com/eligrey/FileSaver.js)
-* ![gtfs-realtime-bindings](https://github.com/MobilityData/gtfs-realtime-bindings)
-* ![Mapbox GL JS](https://github.com/mapbox/mapbox-gl-js)
-
+* ![sample-feed.zip]((https://developers.google.com/transit/gtfs/examples/sample-feed.zip)
 
 ## Screenshots
 

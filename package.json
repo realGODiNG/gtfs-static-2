@@ -1,6 +1,6 @@
 {
   "name": "gtfs-static",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
@@ -9,7 +9,16 @@
   },
   "dependencies": {
     "core-js": "^3.6.5",
-    "vue": "^2.6.11"
+    "jquery": "^3.5.1",
+    "vue": "^2.6.11",
+    "bootstrap-vue": "^2.15.0",
+    "bootstrap": "^4.5.0",
+    "vue-fragment": "^1.5.1",
+    "v-calendar": "^1.0.8",
+    "jszip": "^3.5.0",
+    "file-saver": "^2.0.2",
+    "gtfs-realtime-bindings": "^0.0.5",
+    "mapbox-gl": "^1.11.0"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "~4.4.0",
