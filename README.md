@@ -36,7 +36,7 @@ npm run build
 ## Google transit APIs
 * ![GTFS Static](https://developers.google.com/transit/gtfs)
 * ![GTFS Realtime](https://developers.google.com/transit/gtfs-realtime)
-* ![sample-feed.zip]((https://developers.google.com/transit/gtfs/examples/sample-feed.zip)
+* ![sample-feed.zip](https://developers.google.com/transit/gtfs/examples/sample-feed.zip)
 
 ## Screenshots
 
