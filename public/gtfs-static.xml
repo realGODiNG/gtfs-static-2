@@ -209,7 +209,7 @@
       <map>1.Before Boarding</map>
       <blank/>
     </enumeration>
-      <enumeration>
+    <enumeration>
       <name>Number</name>
       <reference>fare_attributes.transfers.0</reference>
       <map>.Unlimited Transfers</map>

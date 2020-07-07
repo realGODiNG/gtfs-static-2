@@ -1,0 +1,180 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<gtfs_static>
+  <enumerations>
+    <enumeration>
+      <name>Type</name>
+      <reference>stops.location_type.0</reference>
+      <map>0.Stop/Platform</map>
+      <map>1.Station</map>
+      <map>2.Entrance/Exit</map>
+      <map>3.Generic Node</map>
+      <map>4.Boarding Area</map>
+      <blank>0</blank>
+    </enumeration>
+    <enumeration>
+      <name>Information</name>
+      <reference>stops.wheelchair_boarding.0</reference>
+      <map>0.0</map>
+      <map>1.1</map>
+      <map>2.2</map>
+      <blank>0</blank>
+    </enumeration>
+    <enumeration>
+      <name>Type</name>
+      <reference>routes.route_type.0</reference>
+      <map>.</map>
+      <map>0.Tram</map>
+      <map>1.Subway</map>
+      <map>2.Rail</map>
+      <map>3.Bus</map>
+      <map>4.Ferry</map>
+      <map>5.Cable Tram</map>
+      <map>6.Aerial Lift</map>
+      <map>7.Funicular</map>
+      <map>11.Trolleybus</map>
+      <map>12.Monorail</map>
+      <blank/>
+    </enumeration>
+    <enumeration>
+      <name>Direction</name>
+      <reference>trips.direction_id.0</reference>
+      <map>.</map>
+      <map>0.One Direction</map>
+      <map>1.Opposite Direction</map>
+      <blank/>
+    </enumeration>
+    <enumeration>
+      <name>Accommodation</name>
+      <reference>trips.wheelchair_accessible.0</reference>
+      <reference>trips.bikes_allowed.0</reference>
+      <map>0.No Information</map>
+      <map>1.At least one Accommodation</map>
+      <map>2.No Accommodation</map>
+      <blank>0</blank>
+    </enumeration>
+    <enumeration>
+      <name>Method</name>
+      <reference>stop_times.pickup_type.0</reference>
+      <reference>stop_times.drop_off_type.0</reference>
+      <map>0.Regularly sheduled</map>
+      <map>1.Not available</map>
+      <map>2.Must phone Agency</map>
+      <map>3.Must coordinate with Driver</map>
+      <blank>0</blank>
+    </enumeration>
+    <enumeration>
+      <name>Rule</name>
+      <reference>stop_times.timepoint.0</reference>
+      <map>0.Approximation</map>
+      <map>1.Exact Value</map>
+      <blank>1</blank>
+    </enumeration>
+    <enumeration>
+      <name>Boolean</name>
+      <reference>calendar.monday.0</reference>
+      <reference>calendar.tuesday.0</reference>
+      <reference>calendar.wednesday.0</reference>
+      <reference>calendar.thursday.0</reference>
+      <reference>calendar.friday.0</reference>
+      <reference>calendar.saturday.0</reference>
+      <reference>calendar.sunday.0</reference>
+      <reference>pathways.is_bidirectional.0</reference>
+      <reference>attributions.is_producer.0</reference>
+      <reference>attributions.is_operator.0</reference>
+      <reference>attributions.is_authority.0</reference>
+      <map>0.false</map>
+      <map>1.true</map>
+      <blank>0</blank>
+    </enumeration>
+    <enumeration>
+      <name>Type</name>
+      <reference>calendar_dates.exception_type.0</reference>
+      <map>.</map>
+      <map>1.Has been added</map>
+      <map>2.Has been removed</map>
+      <blank/>
+    </enumeration>
+    <enumeration>
+      <name>Method</name>
+      <reference>fare_attributes.payment_method.0</reference>
+      <map>.</map>
+      <map>0.On Board</map>
+      <map>1.Before Boarding</map>
+      <blank/>
+    </enumeration>
+      <enumeration>
+      <name>Number</name>
+      <reference>fare_attributes.transfers.0</reference>
+      <map>.Unlimited Transfers</map>
+      <map>0.No transfers</map>
+      <map>1.May transfer once</map>
+      <map>2.May transfer twice</map>
+      <blank>0</blank>
+    </enumeration>
+    <enumeration>
+      <name>Rule</name>
+      <reference>frequencies.exact_times.0</reference>
+      <map>0.Frequency-based</map>
+      <map>1.Schedule-based</map>
+      <blank>0</blank>
+    </enumeration>
+    <enumeration>
+      <name>Type</name>
+      <reference>transfers.transfer_type.0</reference>
+      <map>0.Recommendeds</map>
+      <map>1.Timed</map>
+      <map>2.Requires minimum Time</map>
+      <map>3.Impossible</map>
+      <blank>0</blank>
+    </enumeration>
+    <enumeration>
+      <name>Type</name>
+      <reference>pathways.pathway_mode.0</reference>
+      <map>.</map>
+      <map>1.Walkway</map>
+      <map>2.Stairs</map>
+      <map>3.Sidewalk/Travelator</map>
+      <map>4.Escalator</map>
+      <map>5.Elevator</map>
+      <map>6.Fare-/Payment-Gate</map>
+      <map>7.Exit Gate</map>
+      <blank/>
+    </enumeration>
+    <enumeration>
+      <name>Name</name>
+      <reference>translations.table_name.0</reference>
+      <map>.</map>
+      <map>agency.Agency</map>
+      <map>stops.Stops</map>
+      <map>routes.Routes</map>
+      <map>trips.Trips</map>
+      <map>stop_times.Stop Times</map>
+      <map>feed_info.Feed Info</map>
+      <map>pathways.Pathways</map>
+      <map>levels.Levels</map>
+      <blank/>
+    </enumeration>
+    <enumeration>
+      <name>Method</name>
+      <reference>routes.continuous_pickup.0</reference>
+      <reference>stop_times.continuous_pickup.0</reference>
+      <map>.</map>
+      <map>0.Continuous Stopping Pickup</map>
+      <map>1.No Continuous Stopping Pickup</map>
+      <map>2.Must phone Agency</map>
+      <map>3.Must coordinate with Driver</map>
+      <blank/>
+    </enumeration>
+    <enumeration>
+      <name>Method</name>
+      <reference>routes.continuous_drop_off.0</reference>
+      <reference>stop_times.continuous_drop_off.0</reference>
+      <map>.</map>
+      <map>0.Continuous Stopping Drop Off</map>
+      <map>1.No Continuous Stopping Drop Off</map>
+      <map>2.Must phone Agency</map>
+      <map>3.Must coordinate with Driver</map>
+      <blank/>
+    </enumeration>
+  </enumerations>
+</gtfs_static>

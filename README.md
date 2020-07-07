@@ -13,6 +13,10 @@ created as part of "Praktikum Algorithmen" (TU Darmstadt, summer semester 2020)
   In production mode a constant string created from it will be used instead - because of same-origin-policy.
   Keep that in mind, when changing this file. (see mounted function in 'src/App.vue' for more information)
   Solving the SOP problem, allows you to delete this string and always use the human readable file instead.
+
+* Python script for generating 'public/gtfs-static.xml' using the 'Google transit APIs' website can be found
+  in the folder 'tools'. Note that enumerations are still given static. (see file 'tools/enumerations.xml')
+  In order to use this script, make sure you have installed the python modules: beautifulsoup, lxml.
   
 * Any trip update in a loaded realtime feed should have a non-empty start day inside the trip descriptor.
   Trip updates created by this app will always have this value - which is needed to compute times for the ui.
