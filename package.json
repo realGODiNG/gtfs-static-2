@@ -15,7 +15,7 @@
     "bootstrap": "^4.5.0",
     "vue-fragment": "^1.5.1",
     "v-calendar": "^1.0.8",
-    "jszip": "^3.5.0",
+    "jszip": "^3.7.0",
     "file-saver": "^2.0.2",
     "gtfs-realtime-bindings": "^0.0.5",
     "mapbox-gl": "^1.11.0"
